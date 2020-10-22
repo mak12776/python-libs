@@ -1,5 +1,21 @@
 import sys
 
+EXIT_NORMAL = 0
+EXIT_ERROR = 1
+EXIT_ARGUMENT_ERROR = 2
+
+
+def class_lookup(_cls):
+    bases = [_cls]
+    root = _cls.__bases__
+    while root:
+        if len(root) == 2:
+            bases = ','.join(map(str, root))
+            raise ValueError(f'a type with more than two bases: {bases}')
+        bases.append(root[0])
+        root = root[0].__bases__
+    return bases
+
 
 def chr_range(*args):
     return map(chr, range(*map(ord, args)))
@@ -9,11 +25,6 @@ class DotDict(dict):
     __getattr__ = dict.__getitem__
     __setattr__ = dict.__setitem__
     __delattr__ = dict.__delitem__
-
-
-EXIT_NORMAL = 0
-EXIT_ERROR = 1
-EXIT_ARGUMENT_ERROR = 2
 
 
 def run_main(func):

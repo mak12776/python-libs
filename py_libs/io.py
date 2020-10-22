@@ -1,7 +1,11 @@
 import io
+import typing
+
+BinaryFile = typing.Union[typing.BinaryIO, io.RawIOBase]
+TextFile = typing.Union[typing.TextIO, io.TextIOBase]
 
 
-def get_file_size(file: io.IOBase):
+def get_file_size(file: BinaryFile):
     current = file.tell()
     file.seek(0, io.SEEK_END)
     size = file.tell()
@@ -9,13 +13,18 @@ def get_file_size(file: io.IOBase):
     return size
 
 
-def read_file(file: io.FileIO) -> bytearray:
+def read_file(file: BinaryFile, name: str) -> bytearray:
     size = get_file_size(file)
     buffer = bytearray(size)
     read_number = file.readinto(buffer)
     if read_number != size:
-        raise EOFError(f'while reading: {file.name}')
+        raise EOFError(f'while reading: {name}')
     return buffer
+
+
+def read_file_name(name: str):
+    with open(name, 'rb', buffering=0) as infile:
+        return read_file(infile, name)
 
 
 def read_int(infile: io.RawIOBase, size: int, byteorder='big', signed=False):
@@ -28,4 +37,3 @@ def read_int(infile: io.RawIOBase, size: int, byteorder='big', signed=False):
 
 def write_int(outfile: io.RawIOBase, value: int, size: int, byteorder='big', signed=False):
     return outfile.write(value.to_bytes(size, byteorder, signed=signed))
-
