@@ -1,0 +1,39 @@
+import sys
+
+
+def chr_range(*args):
+    return map(chr, range(*map(ord, args)))
+
+
+class DotDict(dict):
+    __getattr__ = dict.__getitem__
+    __setattr__ = dict.__setitem__
+    __delattr__ = dict.__delitem__
+
+
+EXIT_NORMAL = 0
+EXIT_ERROR = 1
+EXIT_ARGUMENT_ERROR = 2
+
+
+def run_main(func):
+    sys.exit(func(sys.argv) or 0)
+
+
+def get_program_name(default='main'):
+    return sys.argv[0] if sys.argv else default
+
+
+program_name = get_program_name()
+
+
+def printf(fmt: str, *args, **kwargs):
+    print(fmt.format(*args), **kwargs)
+
+
+def printf_error(fmt: str, *args, **kwargs):
+    printf(f'error: {fmt.format(*args)}', **kwargs)
+
+
+def print_separator(char='-', width=80, end='\n'):
+    print(char * width, end=end)
