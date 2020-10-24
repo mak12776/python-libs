@@ -22,9 +22,10 @@ def read_file(file: BinaryFile, name: str) -> bytearray:
     return buffer
 
 
-def read_file_name(name: str):
-    with open(name, 'rb', buffering=0) as infile:
-        return read_file(infile, name)
+def read_file_name(path: str, text_mode=False):
+    mode = 'rt' if text_mode else 'rb'
+    with open(path, 'rb', buffering=0) as infile:
+        return read_file(infile, path)
 
 
 def read_int(infile: io.RawIOBase, size: int, byteorder='big', signed=False):
