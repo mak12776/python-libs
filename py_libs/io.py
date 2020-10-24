@@ -22,8 +22,7 @@ def read_file(file: BinaryFile, name: str) -> bytearray:
     return buffer
 
 
-def read_file_name(path: str, text_mode=False):
-    mode = 'rt' if text_mode else 'rb'
+def read_file_name(path: str):
     with open(path, 'rb', buffering=0) as infile:
         return read_file(infile, path)
 

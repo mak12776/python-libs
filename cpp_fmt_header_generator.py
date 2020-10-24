@@ -74,9 +74,9 @@ def main():
     if len(result) > 1:
         raise MainError(f'more than one "fmt.h" files found: {",".join(result)}')
     fmt_path = result[0]
-    print(f'format path found: "{fmt_path}"')
+    print(f'header path found: "{fmt_path}"')
 
-    buffer = py_libs.read_file_name(fmt_path, False).decode('ascii')
+    buffer = py_libs.read_file_name(fmt_path).decode('ascii')
     lines = buffer.splitlines(False)
 
     for num, striped_line in enumerate(map(lambda s: s.strip('\t'), lines), 1):
@@ -88,3 +88,7 @@ def main():
     if true_marks != marks:
         raise MainError(f'marks does not match, searched marks: {marks}')
     print('marks have been found!')
+
+    # now we need write "finite-stat machine"
+
+
