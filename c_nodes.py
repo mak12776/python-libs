@@ -16,7 +16,7 @@ class IfNode(BaseNode):
         self.target = target
 
 
-class CaseNode(BaseNode):
+class SwitchCase(BaseNode):
     __slots__ = 'tests', 'target'
 
     def __init__(self, tests: Iterable[str], target: 'BaseNode' = None):
