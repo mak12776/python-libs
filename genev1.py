@@ -1,15 +1,9 @@
 from collections import deque
 from typing import Iterable, List, Callable
 
+from py_libs import quoted, single_quoted
+
 Test = str
-
-
-def quoted(string: str, symbol: str = '"'):
-    return symbol + string.replace(symbol, '\\' + symbol) + symbol
-
-
-def single_quoted(string: str, symbol: str = '\''):
-    return symbol + string.replace(symbol, '\\' + symbol) + symbol
 
 
 class Way:

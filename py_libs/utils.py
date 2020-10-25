@@ -48,3 +48,11 @@ def printf_error(fmt: str, *args, **kwargs):
 
 def print_separator(char='-', width=80, end='\n'):
     print(char * width, end=end)
+
+
+def quoted(string: str, symbol: str = '"'):
+    return symbol + string.replace(symbol, '\\' + symbol) + symbol
+
+
+def single_quoted(string: str, symbol: str = '\''):
+    return symbol + string.replace(symbol, '\\' + symbol) + symbol
