@@ -46,8 +46,13 @@ def printf_error(fmt: str, *args, **kwargs):
     printf(f'error: {fmt.format(*args)}', **kwargs)
 
 
-def print_separator(char='-', width=80, end='\n'):
-    print(char * width, end=end)
+def print_separator(title: str = None, char: str = '-', width: int = 80, end: str = '\n'):
+    if title is None:
+        print(char * width, end=end)
+    else:
+        width -= len(title) + 2
+        left_width, right_width = width // 2, (width // 2) + (width % 2)
+        print((left_width * char) + f' {title} ' + (right_width * char), end=end)
 
 
 def quoted(string: str, symbol: str = '"'):
