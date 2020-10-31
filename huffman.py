@@ -5,12 +5,9 @@ import string
 from collections import defaultdict, deque
 from typing import Union, Callable
 
+from sortedcontainers import SortedList
+
 from py_libs import print_separator
-
-
-def search_function(name):
-    print(name)
-
 
 default_values = (string.digits + string.ascii_uppercase).encode('ascii')
 default_random = random.SystemRandom()
@@ -54,49 +51,18 @@ class Tree:
         self.root = root
 
 
-def calculate_huffman_bits(buffer_size: int, data_width: int,
-                           randbytes: Callable[[int], bytes] = None,
-                           logger: logging.Logger = None):
-    randbytes = randbytes or secrets.token_bytes
-    logger = logger or logging.root
-
-    logger.info('generating bytes...')
-    buffer = randbytes(buffer_size)
-
-    logger.info('counting data...')
+def count_data_width(buffer: bytes, data_width: int):
+    max_index = len(buffer) - (len(buffer) % data_width)
     counts = defaultdict(lambda: 0)
-    max_index = buffer_size - (buffer_size % data_width)
     for index in range(0, max_index, data_width):
-        counts[buffer[index: index + data_width]] += 1
+        counts[buffer[index:index + data_width]] += 1
     remaining = buffer[max_index:]
+    return counts, remaining
 
-    data_type_number = len(counts)
-    possible_data_type_number = 2 ** (data_width * 8)
-    data_type_fraction = data_type_number / possible_data_type_number
 
-    logger.info('sorting...')
-    data_count_list = list(DataCount(key, value) for key, value in counts.items())
-    data_count_list.sort(key=lambda _data_count: _data_count.count)
-
-    logger.info('converting to deque...')
-    data_count_list = deque(data_count_list)
-
-    logger.info('pairing...')
-    while len(data_count_list) != 1:
-        pair = Pair(data_count_list.popleft(), data_count_list.popleft())
-        index = 0
-        for index, temp in enumerate(data_count_list):
-            if pair.count <= temp.count:
-                break
-        data_count_list.insert(index, pair)
-
-    root = data_count_list[0]
-
-    logger.info('setting codecs...')
-
-    root.codec = ''
+def set_tree_codecs(root: Node, initial=''):
+    root.codec = initial
     stack = deque([root])
-
     while len(stack) != 0:
         size = len(stack)
         for index in range(size):
@@ -106,6 +72,36 @@ def calculate_huffman_bits(buffer_size: int, data_width: int,
                 node.right.codec = node.codec + '0'
                 stack.append(node.left)
                 stack.append(node.right)
+
+
+def calculate_huffman_bits(buffer_or_length: Union[bytes, int], data_width: int,
+                           randbytes: Callable[[int], bytes] = None,
+                           logger: logging.Logger = None):
+    randbytes = randbytes or secrets.token_bytes
+    logger = logger or logging.root
+
+    if isinstance(buffer_or_length, bytes):
+        buffer = buffer_or_length
+    elif isinstance(buffer_or_length, int):
+        logger.info('generating random bytes...')
+        buffer = randbytes(buffer_or_length)
+    else:
+        raise TypeError(f'{type(buffer_or_length)}')
+
+    logger.info('counting data...')
+    counts, remaining = count_data_width(buffer, data_width)
+
+    logger.info('sorting...')
+    data_count_list = SortedList((DataCount(key, value) for key, value in counts.items()), key=lambda item: item.count)
+
+    logger.info('pairing...')
+    while len(data_count_list) != 1:
+        pair = Pair(data_count_list.pop(0), data_count_list.pop(0))
+        data_count_list.add(pair)
+    root = data_count_list[0]
+
+    logger.info('setting codecs...')
+    set_tree_codecs(root, '')
 
     logger.info('extracting data count...')
     final_data_count_list = deque()
@@ -125,23 +121,31 @@ def calculate_huffman_bits(buffer_size: int, data_width: int,
     for data_count in final_data_count_list:
         compressed_bits += data_count.count * len(data_count.codec)
 
-    total_bytes = max_index
-    total_bits = max_index * 8
+    # calculate information
+
+    buffer_size = len(buffer)
+
+    data_type_number = len(counts)
+    possible_data_type_number = 2 ** (data_width * 8)
+    data_type_fraction = data_type_number / possible_data_type_number
+
+    total_bytes = buffer_size - (buffer_size % data_width)
+    total_bits = total_bytes * 8
     compressed_bits_fraction = compressed_bits / total_bits
     compressed_bits_diff = compressed_bits - total_bits
 
     # print info
     remaining_format = ' '.join(f'{value:0<2x}' for value in remaining)
 
-    print_separator(title='results', char='~')
-    print(f'buffer size: {buffer_size} byte[s] ({buffer_size * 8} bits)')
-    print(f'total size: {total_bytes} byte[s] ({total_bits} bits)')
-    print(f'data width: {data_width} byte[s] ({data_width * 8} bits)')
-    print(f'remaining: [{remaining_format}] {len(remaining)} ({len(remaining) * 8} byte[s] bits)')
+    print_separator(title='buffer info', char='~')
+    print(f'buffer size: {buffer_size} byte(s) ({buffer_size * 8} bits)')
+    print(f'total size: {total_bytes} byte(s) ({total_bits} bits)')
+    print(f'data width: {data_width} byte(s) ({data_width * 8} bits)')
+    print(f'remaining: {len(remaining)} byte(s) ({len(remaining) * 8} bits) [{remaining_format}]')
 
+    print_separator(title='compressing info', char='~')
     print(f'data type number: {data_type_number} / {possible_data_type_number} ({data_type_fraction:.4f})')
-
-    print(f'total bits: {compressed_bits} / {max_index * 8}'
+    print(f'total bits: {compressed_bits} / {total_bits}'
           f' ({compressed_bits_fraction:.4f}) ({compressed_bits_diff} bits)')
 
     # print_separator(title='final result', char='~')
