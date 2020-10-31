@@ -3,11 +3,11 @@ import random
 import secrets
 import string
 from collections import defaultdict, deque
-from typing import Union, Callable
+from typing import Union, Callable, Tuple
 
 from sortedcontainers import SortedList
 
-from py_libs import print_separator
+from py_libs import print_separator, single_quoted
 
 default_values = (string.digits + string.ascii_uppercase).encode('ascii')
 default_random = random.SystemRandom()
@@ -74,19 +74,38 @@ def set_tree_codecs(root: Node, initial=''):
                 stack.append(node.right)
 
 
-def calculate_huffman_bits(buffer_or_length: Union[bytes, int], data_width: int,
-                           randbytes: Callable[[int], bytes] = None,
-                           logger: logging.Logger = None):
-    randbytes = randbytes or secrets.token_bytes
-    logger = logger or logging.root
+RandBytes = Callable[[int], bytes]
+BufferInfo = Union[bytes, str, int, Tuple[RandBytes, int]]
 
-    if isinstance(buffer_or_length, bytes):
-        buffer = buffer_or_length
-    elif isinstance(buffer_or_length, int):
+
+def get_buffer(buffer_info: BufferInfo, logger: logging.Logger):
+    if isinstance(buffer_info, bytes):
+        return buffer_info
+    elif isinstance(buffer_info, str):
+        logger.info(f'reading file {single_quoted(buffer_info)}...')
+        with open(buffer_info, 'rb') as file:
+            return file.read()
+    elif isinstance(buffer_info, int):
         logger.info('generating random bytes...')
-        buffer = randbytes(buffer_or_length)
+        return secrets.token_bytes(buffer_info)
+    elif isinstance(buffer_info, tuple):
+        logger.info('generating custom random bytes...')
+        randbytes, size = buffer_info
+        return randbytes(size)
     else:
-        raise TypeError(f'{type(buffer_or_length)}')
+        raise TypeError(f'invalid type: {type(buffer_info)}')
+
+
+def pair_counts(data_count_list: SortedList):
+    while len(data_count_list) != 1:
+        pair = Pair(data_count_list.pop(0), data_count_list.pop(0))
+        data_count_list.add(pair)
+    return data_count_list[0]
+
+
+def calculate_huffman_bits(buffer_info: BufferInfo, data_width: int, logger: logging.Logger = None):
+    logger = logger or logging.root
+    buffer = get_buffer(buffer_info, logger)
 
     logger.info('counting data...')
     counts, remaining = count_data_width(buffer, data_width)
@@ -95,13 +114,10 @@ def calculate_huffman_bits(buffer_or_length: Union[bytes, int], data_width: int,
     data_count_list = SortedList((DataCount(key, value) for key, value in counts.items()), key=lambda item: item.count)
 
     logger.info('pairing...')
-    while len(data_count_list) != 1:
-        pair = Pair(data_count_list.pop(0), data_count_list.pop(0))
-        data_count_list.add(pair)
-    root = data_count_list[0]
+    root = pair_counts(data_count_list)
 
     logger.info('setting codecs...')
-    set_tree_codecs(root, '')
+    set_tree_codecs(root)
 
     logger.info('extracting data count...')
     final_data_count_list = deque()
@@ -152,6 +168,8 @@ def calculate_huffman_bits(buffer_or_length: Union[bytes, int], data_width: int,
     # for item in final_data_count_list:
     #     print(item)
 
+
+# ================= OLD CODES =================
 
 def shuffle_str(s: str):
     ls = list(s)
