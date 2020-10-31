@@ -1,3 +1,4 @@
+import re
 import sys
 
 EXIT_NORMAL = 0
@@ -25,6 +26,29 @@ class DotDict(dict):
     __getattr__ = dict.__getitem__
     __setattr__ = dict.__setitem__
     __delattr__ = dict.__delitem__
+
+
+file_size_units = 'KMGTPEZY'
+
+
+def to_human_size(size: int):
+    index = -1
+    while size >= 1024:
+        index += 1
+        if index == len(file_size_units):
+            return f'{size} {file_size_units[-1]}B'
+        size /= 1024
+    if index == -1:
+        return f'{size} B'
+    return f'{size} {file_size_units[index]}B'
+
+
+def to_machine_size(name: str):
+    match = re.fullmatch(f'([1-9][0-9]*) *([{file_size_units}])[bB]?', name)
+    if match is None:
+        raise ValueError(f'invalid name: {name!r}')
+    value, exp = match.groups()
+    return int(value) * (2 ** ((file_size_units.index(exp) + 1) * 10))
 
 
 def run_main(func):
