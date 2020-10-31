@@ -140,29 +140,29 @@ def calculate_huffman_bits(buffer_info: BufferInfo, data_width: int, logger: log
     # calculate information
 
     buffer_size = len(buffer)
+    unique_data_number = len(counts)
 
-    data_type_number = len(counts)
-    possible_data_type_number = 2 ** (data_width * 8)
-    data_type_fraction = data_type_number / possible_data_type_number
+    possible_data_number = 2 ** (data_width * 8)
+    unique_data_percentage = (unique_data_number / possible_data_number) * 100
 
-    total_bytes = buffer_size - (buffer_size % data_width)
-    total_bits = total_bytes * 8
-    compressed_bits_fraction = compressed_bits / total_bits
-    compressed_bits_diff = compressed_bits - total_bits
+    scanned_size = buffer_size - (buffer_size % data_width)
+    scanned_bits = scanned_size * 8
+
+    compressed_bits_percentage = compressed_bits / scanned_bits
 
     # print info
     remaining_format = ' '.join(f'{value:0<2x}' for value in remaining)
 
     print_separator(title='buffer info', char='~')
     print(f'buffer size: {buffer_size} byte(s) ({buffer_size * 8} bits)')
-    print(f'total size: {total_bytes} byte(s) ({total_bits} bits)')
+    print(f'scanned size: {scanned_size} byte(s) ({scanned_bits} bits)')
     print(f'data width: {data_width} byte(s) ({data_width * 8} bits)')
     print(f'remaining: {len(remaining)} byte(s) ({len(remaining) * 8} bits) [{remaining_format}]')
 
     print_separator(title='compressing info', char='~')
-    print(f'data type number: {data_type_number} / {possible_data_type_number} ({data_type_fraction:.4f})')
-    print(f'total bits: {compressed_bits} / {total_bits}'
-          f' ({compressed_bits_fraction:.4f}) ({compressed_bits_diff} bits)')
+    print(f'unique data number: {unique_data_number} / {possible_data_number} ({unique_data_percentage:.2f%})')
+    print(f'total bits: {compressed_bits} / {scanned_bits} ({compressed_bits_percentage:.2f}%)'
+          f' ({compressed_bits - scanned_bits} bits)')
 
     # print_separator(title='final result', char='~')
     # for item in final_data_count_list:
