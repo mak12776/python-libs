@@ -164,7 +164,7 @@ def min_max_average(numbers):
     return min_value, max_value, (average / total)
 
 
-def calculate_huffman_bits(buffer_info: BufferInfo, data_width: int, logger: logging.Logger = None):
+def calculate_bytes(buffer_info: BufferInfo, data_width: int, logger: logging.Logger = None):
     logger = logger or logging.root
     buffer = get_buffer(buffer_info, logger)
 
@@ -212,8 +212,8 @@ def calculate_huffman_bits(buffer_info: BufferInfo, data_width: int, logger: log
     dict_percentage = (dict_bits / scanned_bits) * 100
 
     # total
-    total_bits = dict_bits + codecs_bits
-    total_percentage = (total_bits)
+    total_bits = codecs_bits + dict_bits
+    total_percentage = (total_bits / scanned_bits) * 100
 
     remaining_format = ' '.join(f'{value:0<2x}' for value in remaining)
 
@@ -228,9 +228,10 @@ def calculate_huffman_bits(buffer_info: BufferInfo, data_width: int, logger: log
 
     print_separator(title='compressing info', char='~')
     print(f'unique data number: {unique_data_number} / {possible_data_number} ({unique_data_percentage:.2f}%)')
-    print(f'codecs bits: {codecs_bits} / {buffer_bits} ({codecs_percentage:.2f}%)'
+    print(f'codecs bits: {codecs_bits} / {scanned_bits} ({codecs_percentage:.2f}%)'
           f' ({codecs_bits - scanned_bits:+} bits)')
-    print(f'dict bits: {dict_bits} / {buffer_bits} ({dict_percentage:.2f}%) ({dict_bits - scanned_bits:+})')
+    print(f'dict bits: {dict_bits} / {scanned_bits} ({dict_percentage:.2f}%) ({dict_bits - scanned_bits:+})')
+    print(f'total bits: {total_bits} / {scanned_bits} ({total_percentage:.2f}%)')
 
     # print_separator(title='final result', char='~')
     # for item in final_data_count_list:

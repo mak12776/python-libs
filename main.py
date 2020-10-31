@@ -6,4 +6,4 @@ import huffman
 
 logging.basicConfig(stream=sys.stdout, level=logging.INFO, format='%(levelname)s: %(message)s')
 
-huffman.calculate_huffman_bits(':1 MB', 3)
+huffman.calculate_bytes('music_for_programming_49-julien_mier.mp3', 1)
