@@ -51,13 +51,29 @@ class Tree:
         self.root = root
 
 
-def count_data_width(buffer: bytes, data_width: int):
-    max_index = len(buffer) - (len(buffer) % data_width)
+def count_data_bytes(buffer: bytes, data_size: int):
+    max_index = len(buffer) - (len(buffer) % data_size)
     counts = defaultdict(lambda: 0)
-    for index in range(0, max_index, data_width):
-        counts[buffer[index:index + data_width]] += 1
+    for index in range(0, max_index, data_size):
+        counts[buffer[index:index + data_size]] += 1
     remaining = buffer[max_index:]
     return counts, remaining
+
+
+default_read_size = 4
+
+
+def count_data_bits(buffer: bytes, data_bits: int):
+    pass
+    raise BaseException(f'incomplete code for data_bits: {data_bits}')
+
+
+def count_data_width(buffer: bytes, data_bits: int):
+    if data_bits <= 0:
+        raise ValueError(f'invalid data bits: {data_bits}')
+    if data_bits % 8 == 0:
+        return count_data_bytes(buffer, data_bits // 8)
+    return count_data_bits(buffer, data_bits)
 
 
 def set_tree_codecs(root: Node, initial=1):
@@ -127,14 +143,6 @@ def extract_data_count(node: Node):
     return result
 
 
-def print_size(title: str, size: int):
-    print(f'{title}: {size} byte(s)')
-
-
-def print_percentage(title: str, value: int, total: int):
-    print(f'{title}: {value} / {total} ({value / total:.2f}%)')
-
-
 Number = Union[float, int]
 
 
@@ -164,12 +172,12 @@ def min_max_average(numbers):
     return min_value, max_value, (average / total)
 
 
-def calculate_bytes(buffer_info: BufferInfo, data_width: int, logger: logging.Logger = None):
+def calculate_bytes(buffer_info: BufferInfo, data_bits: int, logger: logging.Logger = None):
     logger = logger or logging.root
     buffer = get_buffer(buffer_info, logger)
 
     logger.info('counting data...')
-    counts, remaining = count_data_width(buffer, data_width)
+    counts, remaining = count_data_width(buffer, data_bits)
 
     logger.info('sorting...')
     data_count_list = SortedList((DataCount(key, value) for key, value in counts.items()), key=lambda item: item.count)
@@ -185,53 +193,52 @@ def calculate_bytes(buffer_info: BufferInfo, data_width: int, logger: logging.Lo
 
     assert len(final_data_count_list) == len(counts)
 
-    logger.info('calculating total bits...')
-    codecs_bits = 0
-    for data_count in final_data_count_list:
-        codecs_bits += data_count.count * len(format_codec(data_count.codec))
-
     # calculate information
+    logger.info('calculating total bits...')
+    buffer_size = len(buffer)
+
+    buffer_bits = buffer_size * 8
+    scanned_bits = buffer_bits - (buffer_bits % data_bits)
+    remaining_bits = len(remaining) * 8
+    remaining_format = ' '.join(f'{value:0<2x}' for value in remaining)
 
     min_count, max_count, average_count = min_max_average(map(lambda item: item.count, final_data_count_list))
-
-    buffer_size = len(buffer)
-    buffer_bits = buffer_size * 8
+    possible_data_number = 2 ** data_bits
 
     unique_data_number = len(counts)
-    possible_data_number = 2 ** (data_width * 8)
     unique_data_percentage = (unique_data_number / possible_data_number) * 100
 
-    scanned_size = buffer_size - (buffer_size % data_width)
-    scanned_bits = scanned_size * 8
-
     # codecs
-    codecs_percentage = (codecs_bits / scanned_bits) * 100
+    codecs_bits = 0
+    for data_count in final_data_count_list:
+        codecs_bits += data_count.count * (len(f'{data_count.codec:b}') - 1)
+    codecs_percentage = (codecs_bits / buffer_bits) * 100
+    codecs_diff = codecs_bits - buffer_bits
 
     # dict
-    dict_bits = (data_width * 8) * unique_data_number
-    dict_percentage = (dict_bits / scanned_bits) * 100
+    dict_bits = data_bits * unique_data_number
+    dict_percentage = (dict_bits / buffer_bits) * 100
+    dict_diff = dict_bits - buffer_bits
 
     # total
     total_bits = codecs_bits + dict_bits
-    total_percentage = (total_bits / scanned_bits) * 100
-
-    remaining_format = ' '.join(f'{value:0<2x}' for value in remaining)
+    total_percentage = (total_bits / buffer_bits) * 100
+    total_diff = total_bits - buffer_bits
 
     # print info
 
     print_separator(title='buffer info', char='~')
-    print(f'buffer size: {buffer_size} byte(s) ({buffer_size * 8} bits)')
-    print(f'data width: {data_width} byte(s) ({data_width * 8} bits)')
-    print(f'scanned size: {scanned_size} byte(s) ({scanned_bits} bits)')
-    print(f'remaining: {len(remaining)} byte(s) ({len(remaining) * 8} bits) [{remaining_format}]')
+    print(f'buffer size: {buffer_bits} bits ({buffer_size} bytes)')
+    print(f'data width: {data_bits} bits')
+    print(f'scanned size: {scanned_bits} bits')
+    print(f'remaining: {remaining_bits} bits [{remaining_format}]')
     print(f'minimum count: {min_count}, maximum count: {max_count}, average count: {average_count:.1f}')
 
     print_separator(title='compressing info', char='~')
     print(f'unique data number: {unique_data_number} / {possible_data_number} ({unique_data_percentage:.2f}%)')
-    print(f'codecs bits: {codecs_bits} / {scanned_bits} ({codecs_percentage:.2f}%)'
-          f' ({codecs_bits - scanned_bits:+} bits)')
-    print(f'dict bits: {dict_bits} / {scanned_bits} ({dict_percentage:.2f}%) ({dict_bits - scanned_bits:+})')
-    print(f'total bits: {total_bits} / {scanned_bits} ({total_percentage:.2f}%)')
+    print(f'codecs bits: {codecs_bits} bits ({codecs_percentage:.2f}%) ({codecs_diff:+} bits)')
+    print(f'dict bits: {dict_bits} bits ({dict_percentage:.2f}%) ({dict_diff:+} bits)')
+    print(f'total bits: {total_bits} bits / {buffer_bits} ({total_percentage:.2f}%) ({total_diff:+} bits)')
 
     # print_separator(title='final result', char='~')
     # for item in final_data_count_list:
