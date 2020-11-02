@@ -7,14 +7,14 @@ TableRow = Sequence[str]
 
 
 class TableSetting:
-    __slots__ = 'min_len', 'empty_len', 'row_algin', 'title_align', \
+    __slots__ = 'min_len', 'vertical_margin', 'row_algin', 'title_align', \
                 'junction_sep', 'horizontal_sep', 'vertical_sep'
 
     def __init__(self,
-                 min_len: int = 0, empty_len: int = 1, row_align: str = '<', title_align: str = '<',
+                 min_len: int = 0, vertical_margin: int = 1, row_align: str = '<', title_align: str = '<',
                  junction_sep: str = '+', horizontal_sep: str = '-', vertical_sep: str = '|'):
         self.min_len = min_len
-        self.empty_len = empty_len
+        self.vertical_margin = vertical_margin
         self.row_algin = row_align
         self.title_align = title_align
 
@@ -24,10 +24,12 @@ class TableSetting:
 
 
 class Table:
-    __slots__ = 'columns_number', 'titles', 'rows'
+    __slots__ = 'columns_number', 'settings', 'titles', 'rows'
 
-    def __init__(self, columns_number: int, titles: TableRow = None, rows: Iterable[TableRow] = None):
+    def __init__(self, columns_number: int, settings: TableSetting = None, titles: TableRow = None,
+                 rows: Iterable[TableRow] = None):
         self.columns_number = columns_number
+        self.settings = settings or TableSetting()
         self.titles = list() if titles is None else list(titles)
         if rows is not None:
             for index, row in enumerate(rows):
@@ -39,16 +41,16 @@ class Table:
 
     def set_titles(self, *args: str):
         if len(args) != self.columns_number:
-            raise ValueError(f'invalid number of columns: {args}')
+            raise ValueError(f'invalid number of columns: {len(args)}')
         self.titles = list(args)
 
     def add_row(self, *args: str):
         if len(args) != self.columns_number:
-            raise ValueError(f'invalid number of columns: {args}')
+            raise ValueError(f'invalid number of columns: {len(args)}')
         self.rows.append(args)
 
     def print_ext(self,
-                  min_len: int = 0, empty_len: int = 1, row_align: str = '<', title_align: str = '<',
+                  min_len: int = 0, vertical_margin: int = 0, row_align: str = '<', title_align: str = '<',
                   junction_sep: str = '+', horizontal_sep: str = '-', vertical_sep: str = '|',
                   file=stdout, flush: bool = True):
 
@@ -60,8 +62,9 @@ class Table:
             for index, column in enumerate(row):
                 if len(column) > max_columns_len[index]:
                     max_columns_len[index] = len(column)
-        for index in range(self.columns_number):
-            max_columns_len[index] += empty_len
+
+        junction_sep = f'{horizontal_sep * vertical_margin}{junction_sep}{horizontal_sep * vertical_margin}'
+        vertical_sep = f'{" " * vertical_margin}{vertical_sep}{" " * vertical_margin}'
 
         horizontal_line = junction_sep.join(
             horizontal_sep * max_columns_len[index] for index in range(self.columns_number)
@@ -78,9 +81,9 @@ class Table:
             _print(row_line.format(*row))
 
     def print(self, setting: TableSetting = None, file=stdout, flush: bool = True):
-        setting = setting or TableSetting()
+        setting = setting or self.settings
         self.print_ext(
-            min_len=setting.min_len, empty_len=setting.empty_len,
+            min_len=setting.min_len, vertical_margin=setting.vertical_margin,
             row_align=setting.row_algin, title_align=setting.title_align,
 
             junction_sep=setting.junction_sep,

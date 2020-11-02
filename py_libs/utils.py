@@ -31,23 +31,26 @@ class DotDict(dict):
 file_size_units = 'KMGTPEZY'
 
 
-def to_human_size(size: int):
+def to_human_size(size: int, format_string: str = None):
+    format_string = format_string or '{0:.2f} {1}'
     index = -1
     while size >= 1024:
         index += 1
         if index == len(file_size_units):
-            return f'{size} {file_size_units[-1]}B'
+            return format_string.format(size, f'{file_size_units[-1]}B')
         size /= 1024
     if index == -1:
-        return f'{size} B'
-    return f'{size} {file_size_units[index]}B'
+        return format_string.format(size, 'B')
+    return format_string.format(size, f'{file_size_units[index]}B')
 
 
 def to_machine_size(name: str):
-    match = re.fullmatch(f'([1-9][0-9]*) *([{file_size_units}])[bB]?', name)
+    match = re.fullmatch(f'([1-9][0-9]*) *([{file_size_units}]?)[bB]', name)
     if match is None:
         raise ValueError(f'invalid name: {name!r}')
     value, exp = match.groups()
+    if len(exp) == 0:
+        return int(value)
     return int(value) * (2 ** ((file_size_units.index(exp) + 1) * 10))
 
 

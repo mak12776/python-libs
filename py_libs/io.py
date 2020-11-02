@@ -1,16 +1,22 @@
 import io
+import os
 import typing
+from io import RawIOBase
+from typing import Union
 
 BinaryFile = typing.Union[typing.BinaryIO, io.RawIOBase]
 TextFile = typing.Union[typing.TextIO, io.TextIOBase]
 
 
-def get_file_size(file: BinaryFile):
-    current = file.tell()
-    file.seek(0, io.SEEK_END)
-    size = file.tell()
-    file.seek(current, io.SEEK_SET)
-    return size
+def get_file_size(file_or_name: Union[BinaryFile, str]):
+    if isinstance(file_or_name, str):
+        return os.stat(file_or_name).st_size
+    elif isinstance(file_or_name, RawIOBase):
+        current = file_or_name.tell()
+        file_or_name.seek(0, io.SEEK_END)
+        size = file_or_name.tell()
+        file_or_name.seek(current, io.SEEK_SET)
+        return size
 
 
 def read_file(file: BinaryFile, name: str) -> bytearray:

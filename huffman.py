@@ -7,7 +7,7 @@ from typing import Union, Callable, Tuple
 
 from sortedcontainers import SortedList
 
-from py_libs import print_separator, single_quoted, to_machine_size
+from py_libs import print_separator, single_quoted, to_machine_size, to_human_size
 
 default_values = (string.digits + string.ascii_uppercase).encode('ascii')
 default_random = random.SystemRandom()
@@ -51,6 +51,17 @@ class Tree:
         self.root = root
 
 
+default_read_size = 4
+
+
+class Bits:
+    __slots__ = 'value', 'size'
+
+    def __init__(self, value: int, size: int):
+        self.value = value
+        self.size = size
+
+
 def count_data_bytes(buffer: bytes, data_size: int):
     max_index = len(buffer) - (len(buffer) % data_size)
     counts = defaultdict(lambda: 0)
@@ -60,11 +71,7 @@ def count_data_bytes(buffer: bytes, data_size: int):
     return counts, remaining
 
 
-default_read_size = 4
-
-
 def count_data_bits(buffer: bytes, data_bits: int):
-    pass
     raise BaseException(f'incomplete code for data_bits: {data_bits}')
 
 
@@ -155,12 +162,16 @@ class MinMaxAverage:
         self.average = average
 
 
+class HuffmanInfo:
+    __slots__ = 'buffer_bits', 'scanned_bits'
+
+
 def min_max_average(numbers):
     iterable = iter(numbers)
     try:
         min_value = max_value = average = next(iterable)
     except StopIteration:
-        return None
+        raise ValueError('empty list of numbers')
     total = 1
     for value in iterable:
         if value > max_value:
@@ -194,6 +205,7 @@ def calculate_bytes(buffer_info: BufferInfo, data_bits: int, logger: logging.Log
     assert len(final_data_count_list) == len(counts)
 
     # calculate information
+
     logger.info('calculating total bits...')
     buffer_size = len(buffer)
 
@@ -228,21 +240,17 @@ def calculate_bytes(buffer_info: BufferInfo, data_bits: int, logger: logging.Log
     # print info
 
     print_separator(title='buffer info', char='~')
-    print(f'buffer size: {buffer_bits} bits ({buffer_size} bytes)')
+    print(f'buffer: {buffer_bits:,} bits ({to_human_size(buffer_size)})')
     print(f'data width: {data_bits} bits')
-    print(f'scanned size: {scanned_bits} bits')
+    print(f'scanned: {scanned_bits:,} bits')
     print(f'remaining: {remaining_bits} bits [{remaining_format}]')
-    print(f'minimum count: {min_count}, maximum count: {max_count}, average count: {average_count:.1f}')
 
     print_separator(title='compressing info', char='~')
-    print(f'unique data number: {unique_data_number} / {possible_data_number} ({unique_data_percentage:.2f}%)')
-    print(f'codecs bits: {codecs_bits} bits ({codecs_percentage:.2f}%) ({codecs_diff:+} bits)')
-    print(f'dict bits: {dict_bits} bits ({dict_percentage:.2f}%) ({dict_diff:+} bits)')
-    print(f'total bits: {total_bits} bits / {buffer_bits} ({total_percentage:.2f}%) ({total_diff:+} bits)')
-
-    # print_separator(title='final result', char='~')
-    # for item in final_data_count_list:
-    #     print(item)
+    print(f'unique data number: {unique_data_number:,} / {possible_data_number:,} ({unique_data_percentage:.2f}%)')
+    print(f'count info: >= {min_count}, <= {max_count}, ~ {average_count:.2f}')
+    print(f'codecs: {codecs_bits:,} bits ({codecs_percentage:.2f}%) ({codecs_diff:+,} bits)')
+    print(f'dict: {dict_bits:,} bits ({dict_percentage:.2f}%) ({dict_diff:+,} bits)')
+    print(f'total: {total_bits:,} bits / {buffer_bits:} ({total_percentage:.2f}%) ({total_diff:+,} bits)')
 
 # ================= OLD CODES =================
 
