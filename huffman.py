@@ -1,7 +1,5 @@
 import logging
-import random
 import secrets
-import string
 from collections import defaultdict, deque
 from typing import Union, Callable, Tuple, Dict, MutableSequence
 
@@ -10,9 +8,6 @@ from sortedcontainers import SortedList
 from py_libs.fmt import print_separator, printf
 from py_libs.math import min_max_average
 from py_libs.utils import to_machine_size, single_quoted, to_human_size
-
-default_values = (string.digits + string.ascii_uppercase).encode('ascii')
-default_random = random.SystemRandom()
 
 
 class Node:
@@ -87,7 +82,7 @@ def convert_count_dict(source: CountDict, target_size: int):
         raise ValueError(f'invalid data size: {data_size}')
     if data_size % target_size:
         raise ValueError(f'can\'t convert from {data_size} to {target_size}')
-    raise BaseException('incomplete error')
+    raise BaseException('incomplete code')
 
 
 def count_data_bits(buffer: bytes, data_bits: int):
@@ -200,7 +195,7 @@ def scan_buffer(buffer_info: BufferInfo, data_bits: int, logger: logging.Logger 
     buffer = get_buffer(buffer_info, logger)
 
     logger.info('counting data...')
-    data_count_dict, remaining = count_data_bytes(buffer, data_bits)
+    data_count_dict, remaining = count_data_width(buffer, data_bits)
 
     logger.info('sorting...')
     data_count_list = SortedList(
