@@ -48,10 +48,10 @@ def to_machine_size(name: str):
     match = re.fullmatch(f'([1-9][0-9]*) *([{file_size_units}]?)[bB]', name)
     if match is None:
         raise ValueError(f'invalid name: {name!r}')
-    value, exp = match.groups()
+    integer, exp = match.groups()
     if len(exp) == 0:
-        return int(value)
-    return int(value) * (2 ** ((file_size_units.index(exp) + 1) * 10))
+        return int(integer)
+    return int(integer) * (2 ** ((file_size_units.index(exp) + 1) * 10))
 
 
 def run_main(func):
@@ -71,15 +71,6 @@ def printf(fmt: str, *args, **kwargs):
 
 def printf_error(fmt: str, *args, **kwargs):
     printf(f'error: {fmt.format(*args)}', **kwargs)
-
-
-def print_separator(title: str = None, char: str = '-', width: int = 80, end: str = '\n'):
-    if title is None:
-        print(char * width, end=end)
-    else:
-        width -= len(title) + 2
-        left_width, right_width = width // 2, (width // 2) + (width % 2)
-        print((left_width * char) + f' {title} ' + (right_width * char), end=end)
 
 
 def quoted(string: str, symbol: str = '"'):
