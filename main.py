@@ -47,5 +47,5 @@ def compute_info(size: Union[str, int], max_data_width=32, table_settings: Table
 
 
 # print_info("70 MB", max_data_width=128)
-info = scan_buffer('music_for_programming_49-julien_mier.mp3', 1)
+info = scan_buffer('music_for_programming_49-julien_mier.mp3', 8)
 print_info(info)
