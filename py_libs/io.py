@@ -43,3 +43,10 @@ def read_int(infile: io.RawIOBase, size: int, byteorder='big', signed=False):
 
 def write_int(outfile: io.RawIOBase, value: int, size: int, byteorder='big', signed=False):
     return outfile.write(value.to_bytes(size, byteorder, signed=signed))
+
+
+class FunctionCache:
+    __slots__ = 'parent_directory'
+
+    def __init__(self, parent_directory: str):
+        self.parent_directory = parent_directory

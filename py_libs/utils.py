@@ -1,5 +1,7 @@
 import re
 import sys
+import time
+from collections import deque
 
 EXIT_NORMAL = 0
 EXIT_ERROR = 1
@@ -65,17 +67,22 @@ def get_program_name(default='main'):
 program_name = get_program_name()
 
 
-def printf(fmt: str, *args, **kwargs):
-    print(fmt.format(*args), **kwargs)
+class StopWatch:
+    __slots__ = 'now', 'start_time', 'laps'
 
+    def __init__(self, start: bool = False, now=None):
+        self.now = now or time.perf_counter
+        self.start_time = self.now() if start else 0
+        self.laps = deque()
 
-def printf_error(fmt: str, *args, **kwargs):
-    printf(f'error: {fmt.format(*args)}', **kwargs)
+    def start(self):
+        self.start_time = self.now()
 
+    def lap(self):
+        self.laps.append(self.now())
 
-def quoted(string: str, symbol: str = '"'):
-    return symbol + string.replace(symbol, '\\' + symbol) + symbol
-
-
-def single_quoted(string: str, symbol: str = '\''):
-    return symbol + string.replace(symbol, '\\' + symbol) + symbol
+    def print(self):
+        start = self.start_time
+        for num, lap in enumerate(self.laps, 1):
+            print(f'lap {num}: {lap - start:.10f}')
+            start = lap

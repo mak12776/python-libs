@@ -5,9 +5,9 @@ from typing import Union, Callable, Tuple, Dict, MutableSequence
 
 from sortedcontainers import SortedList
 
-from py_libs.fmt import print_separator, printf
+from py_libs.fmt import print_separator, printf, single_quoted
 from py_libs.math import min_max_average
-from py_libs.utils import to_machine_size, single_quoted, to_human_size
+from py_libs.utils import to_machine_size, to_human_size
 
 
 class Node:
@@ -48,9 +48,6 @@ class Tree:
         self.root = root
 
 
-default_read_size = 4
-
-
 class Bits:
     __slots__ = 'value', 'size'
 
@@ -59,42 +56,50 @@ class Bits:
         self.size = size
 
 
-CountDict = Dict[bytes, int]
+DataType = Union[int, bytes]
+CountDict = Dict[DataType, int]
+
+size_of_size = 4
 
 
-def count_data_bytes(buffer: bytes, data_size: int):
-    max_index = len(buffer) - (len(buffer) % data_size)
-    counts = defaultdict(lambda: 0)
-    for index in range(0, max_index, data_size):
-        counts[buffer[index:index + data_size]] += 1
-    remaining = buffer[max_index:]
-    return counts, remaining
+class SegmentedBuffer:
+    __slots__ = 'count_dict', 'remaining'
+
+    def __init__(self, count_dict: CountDict, remaining: bytes):
+        self.count_dict = count_dict
+        self.remaining = remaining
 
 
-def convert_count_dict(source: CountDict, target_size: int):
-    try:
-        data_size = len(next(iter(source.keys())))
-    except StopIteration:
-        raise ValueError('source dict is empty')
-    if data_size == 0:
-        raise ValueError('length of source data is zero')
-    if target_size >= data_size:
-        raise ValueError(f'invalid data size: {data_size}')
-    if data_size % target_size:
-        raise ValueError(f'can\'t convert from {data_size} to {target_size}')
-    raise BaseException('incomplete code')
+class HuffmanInfo:
+    __slots__ = 'buffer', 'data_bits', 'segmented_buffer', 'codec_list'
+
+    def __init__(self, buffer: bytes, data_bits: int,
+                 segmented_buffer: SegmentedBuffer, codec_list: MutableSequence[DataCount]):
+        self.buffer = buffer
+        self.data_bits = data_bits
+        self.segmented_buffer = segmented_buffer
+        self.codec_list = codec_list
 
 
-def count_data_bits(buffer: bytes, data_bits: int):
-    raise BaseException(f'incomplete code for data_bits: {data_bits}')
+default_read_size = 4
+
+
+def convert_count_dict(source: CountDict, data_bits: int, target_bits: int):
+    pass
 
 
 def count_data_width(buffer: bytes, data_bits: int):
     if data_bits <= 0:
         raise ValueError(f'invalid data bits: {data_bits}')
     if data_bits % 8 == 0:
-        return count_data_bytes(buffer, data_bits // 8)
-    return count_data_bits(buffer, data_bits)
+        data_bits //= 8
+        max_index = len(buffer) - (len(buffer) % data_bits)
+        counts = defaultdict(lambda: 0)
+        for index in range(0, max_index, data_bits):
+            counts[buffer[index:index + data_bits]] += 1
+        remaining = buffer[max_index:]
+        return counts, remaining
+    raise BaseException(f'incomplete code for data_bits: {data_bits}')
 
 
 Codec = int
@@ -124,7 +129,6 @@ def format_codec(codec: int):
 
 RandBytes = Callable[[int], bytes]
 BufferInfo = Union[bytes, str, int, Tuple[RandBytes, int]]
-data_folder_name = '.data'
 
 
 def get_buffer(buffer_info: BufferInfo, logger: logging.Logger):
@@ -169,25 +173,6 @@ def extract_data_count(node: Node):
             node = node.right
         result.append(node)
     return result
-
-
-class SegmentedBuffer:
-    __slots__ = 'count_dict', 'remaining'
-
-    def __init__(self, count_dict: Dict[bytes, int], remaining: bytes):
-        self.count_dict = count_dict
-        self.remaining = remaining
-
-
-class HuffmanInfo:
-    __slots__ = 'buffer', 'data_bits', 'segmented_buffer', 'codec_list'
-
-    def __init__(self, buffer: bytes, data_bits: int,
-                 segmented_buffer: SegmentedBuffer, codec_list: MutableSequence[DataCount]):
-        self.buffer = buffer
-        self.data_bits = data_bits
-        self.segmented_buffer = segmented_buffer
-        self.codec_list = codec_list
 
 
 def scan_buffer(buffer_info: BufferInfo, data_bits: int, logger: logging.Logger = None):

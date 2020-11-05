@@ -1,8 +1,22 @@
 import sys
 
 
+def quoted(string: str, symbol: str = '"'):
+    string = string.replace(symbol, f'\\{symbol}')
+    return f'{symbol}{string}{symbol}'
+
+
+def single_quoted(string: str, symbol: str = '\''):
+    string = string.replace(symbol, f'\\{symbol}')
+    return f'{symbol}{string}{symbol}'
+
+
 def printf(string: str, *args, **kwargs):
     print(string.format(*args, **kwargs))
+
+
+def printf_error(fmt: str, *args, **kwargs):
+    printf(f'error: {fmt.format(*args)}', **kwargs)
 
 
 def format_separator(title: str = None, char: str = '-', width: int = 80):
