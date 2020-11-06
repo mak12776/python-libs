@@ -1,7 +1,10 @@
 import io
+import json
 import os
 import typing
+from collections import namedtuple
 from io import RawIOBase
+from os import path
 from typing import Union
 
 BinaryFile = typing.Union[typing.BinaryIO, io.RawIOBase]
@@ -45,8 +48,52 @@ def write_int(outfile: io.RawIOBase, value: int, size: int, byteorder='big', sig
     return outfile.write(value.to_bytes(size, byteorder, signed=signed))
 
 
-class FunctionCache:
-    __slots__ = 'parent_directory'
+ReadWrite = namedtuple('ReadWrite', ['read', 'write'])
 
-    def __init__(self, parent_directory: str):
-        self.parent_directory = parent_directory
+data_cache_json_setting = {
+    'allow_nan': False,
+    'separators': (',', ':')
+}
+
+data_cache_name = '.cache_info'
+
+
+class DataCache:
+    __slots__ = 'dir_name'
+
+    def __init__(self, dir_name: str):
+        self.dir_name = dir_name
+
+    def load_info_data(self):
+        info_path = path.join(self.dir_name, data_cache_name)
+        try:
+            with open(info_path, 'rt') as infile:
+                return json.load(infile)
+        except FileNotFoundError:
+            return {'titles': {}, 'max_index': -1}
+
+    def save_info_data(self, cache_data):
+        info_path = path.join(self.dir_name, data_cache_name)
+        with open(info_path, 'wt') as outfile:
+            json.dump(cache_data, outfile, **data_cache_json_setting)
+
+    def cached_function(self, title: str, read_write: ReadWrite, function, *args, **kwargs):
+        info_data = self.load_info_data()
+        index_format = '0>10'
+        try:
+            index = info_data['titles'][title]
+            just_read = True
+        except KeyError:
+            index = info_data['titles'][title] = info_data['max_index'] = info_data['max_index'] + 1
+            just_read = False
+        if just_read:
+            file_path = path.join(self.dir_name, f'{index:{index_format}}')
+            with open(file_path, 'rb') as infile:
+                return read_write.read(infile)
+        else:
+            data = function(*args, **kwargs)
+            self.save_info_data(info_data)
+            file_path = path.join(self.dir_name, f'{index:{index_format}}')
+            with open(file_path, 'wb') as outfile:
+                read_write.write(data, outfile)
+            return data

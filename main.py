@@ -1,14 +1,17 @@
 # allocating memory as much as needed.
+import base64
+import hashlib
 import logging
+import marshal
 import math
 import sys
 from collections import defaultdict
-from typing import Union
+from io import RawIOBase
+from typing import Union, List
 
-from py_libs.io import get_file_size
-from py_libs.misc import generate_password
+from py_libs.io import get_file_size, DataCache, ReadWrite, read_int, write_int
 from py_libs.table import Table, TableSetting
-from py_libs.utils import to_machine_size, to_human_size
+from py_libs.utils import to_machine_size, to_human_size, StopWatch
 
 logging.basicConfig(stream=sys.stdout, format='%(levelname)s: %(message)s', level=logging.DEBUG)
 
@@ -90,10 +93,53 @@ def count_data_width_second(buffer: bytes, data_bits: int):
     raise BaseException(f'incomplete code for data_bits: {data_bits}')
 
 
-print(generate_password())
+def hash_bytes(name, buffer: bytes):
+    h = hashlib.new(name, buffer)
+    h.update(buffer)
+    return h.digest()
+
+
+def get_function_title(func):
+    buffer = marshal.dumps(func.__code__)
+    digest = base64.b64encode(hash_bytes('sha256', buffer)).decode('ascii')
+    return f'{func.__name__}:{digest}:{len(buffer)}'
+
+
+def simple_function(size: int):
+    numbers = []
+    for num in range(0, size + 1, 2):
+        numbers.append(num)
+    for index in range(len(numbers)):
+        numbers[index] *= 100
+    return numbers
+
+
+number_size = 8
+
+
+def read_numbers(file):
+    numbers = [0] * read_int(file, number_size)
+    for index in range(len(numbers)):
+        numbers[index] = read_int(file, number_size)
+    return numbers
+
+
+def write_numbers(numbers: List[int], file: RawIOBase):
+    write_int(file, len(numbers), number_size)
+    for num in numbers:
+        write_int(file, num, number_size)
+
+
+read_write = ReadWrite(read_numbers, write_numbers)
+title = get_function_title(simple_function)
+
+stop_watch = StopWatch(True)
+DataCache('.data').cached_function(title, read_write, simple_function, 20_000_000)
+stop_watch.lap()
+
+stop_watch.print()
 
 # test_buffer = get_buffer(':10 MB', logging.root)
-#
 # stop_watch = StopWatch(True)
 # count_data_width_first(test_buffer, 16)
 # stop_watch.lap()
