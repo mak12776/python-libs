@@ -7,9 +7,11 @@ import math
 import sys
 from collections import defaultdict
 from io import RawIOBase
-from typing import Union, List
+from typing import Union
 
-from py_libs.io import get_file_size, DataCache, ReadWrite, read_int, write_int
+import numpy
+
+from py_libs.io import get_file_size, ReadWrite, DataCache
 from py_libs.table import Table, TableSetting
 from py_libs.utils import to_machine_size, to_human_size, StopWatch
 
@@ -106,10 +108,10 @@ def get_function_title(func):
 
 
 def simple_function(size: int):
-    numbers = []
-    for num in range(0, size + 1, 2):
-        numbers.append(num)
-    for index in range(len(numbers)):
+    numbers = numpy.ndarray((size,), numpy.int32)
+    for index in range(size):
+        numbers[index] = index
+    for index in range(size):
         numbers[index] *= 100
     return numbers
 
@@ -117,27 +119,24 @@ def simple_function(size: int):
 number_size = 8
 
 
-def read_numbers(file):
-    numbers = [0] * read_int(file, number_size)
-    for index in range(len(numbers)):
-        numbers[index] = read_int(file, number_size)
-    return numbers
+def read_numbers(file: RawIOBase):
+    return numpy.frombuffer(file.read(), numpy.int32)
 
 
-def write_numbers(numbers: List[int], file: RawIOBase):
-    write_int(file, len(numbers), number_size)
-    for num in numbers:
-        write_int(file, num, number_size)
+def write_numbers(numbers: numpy.ndarray, file: RawIOBase):
+    file.write(numbers.tobytes())
 
 
 read_write = ReadWrite(read_numbers, write_numbers)
 title = get_function_title(simple_function)
 
 stop_watch = StopWatch(True)
-DataCache('.data').cached_function(title, read_write, simple_function, 20_000_000)
+result = DataCache('.data').cached_function(title, read_write, simple_function, 20_000_000)
 stop_watch.lap()
 
 stop_watch.print()
+
+print(result)
 
 # test_buffer = get_buffer(':10 MB', logging.root)
 # stop_watch = StopWatch(True)
