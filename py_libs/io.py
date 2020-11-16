@@ -2,10 +2,9 @@ import io
 import json
 import os
 import typing
-from collections import namedtuple
 from io import RawIOBase
 from os import path
-from typing import Union
+from typing import Union, Callable, Tuple, Any
 
 BinaryFile = typing.Union[typing.BinaryIO, io.RawIOBase]
 TextFile = typing.Union[typing.TextIO, io.TextIOBase]
@@ -48,7 +47,7 @@ def write_int(outfile: io.RawIOBase, value: int, size: int, byteorder='big', sig
     return outfile.write(value.to_bytes(size, byteorder, signed=signed))
 
 
-ReadWrite = namedtuple('ReadWrite', ['read', 'write'])
+ReadWrite = Tuple[Callable[[BinaryFile], Any], Callable[[Any, BinaryFile], None]]
 
 data_cache_json_setting = {
     'allow_nan': False,
@@ -79,7 +78,7 @@ class DataCache:
 
     def cached_function(self, title: str, read_write: ReadWrite, function, *args, **kwargs):
         info_data = self.load_info_data()
-        index_format = '0>10'
+        data_name_format: Callable[[int], str] = lambda file_index: f'{file_index}.bin'
         try:
             index = info_data['titles'][title]
             just_read = True
@@ -87,13 +86,13 @@ class DataCache:
             index = info_data['titles'][title] = info_data['max_index'] = info_data['max_index'] + 1
             just_read = False
         if just_read:
-            file_path = path.join(self.dir_name, f'{index:{index_format}}')
+            file_path = path.join(self.dir_name, data_name_format(index))
             with open(file_path, 'rb') as infile:
-                return read_write.read(infile)
+                return read_write[0](infile)
         else:
             data = function(*args, **kwargs)
             self.save_info_data(info_data)
-            file_path = path.join(self.dir_name, f'{index:{index_format}}')
+            file_path = path.join(self.dir_name, data_name_format(index))
             with open(file_path, 'wb') as outfile:
-                read_write.write(data, outfile)
+                read_write[1](data, outfile)
             return data
