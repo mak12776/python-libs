@@ -21,7 +21,7 @@ def compute_info(size: Union[str, int], max_data_width=32, table_settings: Table
     bits = size * 8
 
     table_settings = table_settings or TableSetting(vertical_margin=1, title_align='<', row_align='>')
-    table = Table(9, table_settings)
+    table = Table(table_settings)
 
     table.set_titles('data bits', 'scanned', 'remaining', 'total count',
                      'possible data number', 'max unique data number', 'max dict size',

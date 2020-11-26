@@ -2,7 +2,8 @@ from collections import deque, defaultdict
 from random import choice
 from typing import List, Dict
 
-from py_libs import chr_range, single_quoted
+from py_libs.fmt import single_quoted
+from py_libs.utils import chr_range
 
 
 def print_title(title: str, max_length: int = 80):

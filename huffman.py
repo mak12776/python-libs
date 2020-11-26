@@ -124,7 +124,7 @@ def set_tree_codecs(root: Node, initial=1):
 
 
 def format_codec(codec: int):
-    return f'{codec:b}'[1:]
+    return f'{codec:b}'[2:]
 
 
 RandBytes = Callable[[int], bytes]

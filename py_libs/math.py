@@ -9,6 +9,14 @@ def lower_bound(value: int, divisor: int):
     return value - (value % divisor)
 
 
+def ceil_module(value: int, divisor: int):
+    return value // divisor
+
+
+def floor_module(value: int, divisor: int):
+    return (value // divisor) + (1 if value % divisor else 0)
+
+
 def min_max_average(numbers):
     iterable = iter(numbers)
     try:

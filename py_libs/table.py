@@ -24,29 +24,17 @@ class TableSetting:
 
 
 class Table:
-    __slots__ = 'columns_number', 'settings', 'titles', 'rows'
+    __slots__ = 'settings', 'titles', 'rows'
 
-    def __init__(self, columns_number: int, settings: TableSetting = None, titles: TableRow = None,
-                 rows: Iterable[TableRow] = None):
-        self.columns_number = columns_number
+    def __init__(self, settings: TableSetting = None, titles: TableRow = None, rows: Iterable[TableRow] = None):
         self.settings = settings or TableSetting()
         self.titles = list() if titles is None else list(titles)
-        if rows is not None:
-            for index, row in enumerate(rows):
-                if len(row) != self.columns_number:
-                    raise ValueError(f'invalid number of columns in row {index}')
-            self.rows = deque(rows)
-        else:
-            self.rows = deque()
+        self.rows = deque() if rows is None else deque(rows)
 
     def set_titles(self, *args: str):
-        if len(args) != self.columns_number:
-            raise ValueError(f'invalid number of columns: {len(args)}')
         self.titles = list(args)
 
     def add_row(self, *args: str):
-        if len(args) != self.columns_number:
-            raise ValueError(f'invalid number of columns: {len(args)}')
         self.rows.append(args)
 
     def print_ext(self,
@@ -57,19 +45,26 @@ class Table:
         if len(vertical_sep) != len(junction_sep):
             raise ValueError('length of vertical_sep & junction_sep is different.')
 
-        max_columns_len = [min_len] * self.columns_number
+        max_columns_number = 0
+        for row in chain([self.titles], self.rows):
+            max_columns_number = max(max_columns_number, len(row))
+
+        if max_columns_number == 0:
+            return
+
+        max_columns_len = [min_len] * max_columns_number
         for row in chain([self.titles], self.rows):
             for index, column in enumerate(row):
                 if len(column) > max_columns_len[index]:
                     max_columns_len[index] = len(column)
 
         junction_sep = f'{horizontal_sep * vertical_margin}{junction_sep}{horizontal_sep * vertical_margin}'
-        vertical_sep = f'{" " * vertical_margin}{vertical_sep}{" " * vertical_margin}'
+        _vertical_width = vertical_margin * len(horizontal_sep)
+        vertical_sep = f'{" " * _vertical_width}{vertical_sep}{" " * _vertical_width}'
 
-        horizontal_line = junction_sep.join(
-            horizontal_sep * max_columns_len[index] for index in range(self.columns_number)
-        )
         title_line = vertical_sep.join(f'{{:{title_align}{_len}}}' for _len in max_columns_len)
+        horizontal_line = junction_sep.join(
+            horizontal_sep * max_columns_len[index] for index in range(max_columns_number))
         row_line = vertical_sep.join(f'{{:{row_align}{_len}}}' for _len in max_columns_len)
 
         def _print(string):
