@@ -1,60 +1,49 @@
 # allocating memory as much as needed.
-from py_libs.math import ceil_module
-from py_libs.misc import generate_password
-from py_libs.table import TableSetting, Table
+import re
+from os import path
 
+folder_contents = [
+    'dump.txt',
+    'state.txt',
+    'dis.txt'
+]
 
-class Info:
-    __slots__ = ('buffer_bits', 'buffer_size',
-                 'data_bits', 'data_size',
-                 'remaining_bits', 'remaining_size',
-                 'possible_data_number', 'total_data_number')
+root_folder = r"D:\Codes\micro-test\Tutorial 10P"
 
+file_path = path.join(root_folder, "dump.txt")
 
-def get_bytes_per_bits(bits: int):
-    return ceil_module(bits, 8)
+with open(file_path, "rb") as file:
+    buffer = file.read()
 
+lines = buffer.splitlines()
+addr_values = []
+for index in range(len(lines)):
+    m = re.match(b'([0-9a-f]{4}): {3}(\\*|(?:[0-9a-f]{4} ){8})', lines[index])
+    if m is None:
+        print(f'ERROR: {lines[index]!r} => didn\'t match pattern')
+    first = int(m.group(1), 16)
+    if m.group(2) == b'*':
+        second = 'zero'
+    else:
+        second = []
+        for item in filter(lambda s: s, m.group(2).split(b' ')):
+            second.append(item[:2])
+            second.append(item[2:])
+        second = tuple(map(lambda s: int(s, 16), second))
+    addr_values.append((int(m.group(1), 16), second))
 
-def compute_info(buffer_bits: int, data_bits: int):
-    info = Info()
+hex_digits = '[0-9a-f]{4}'
 
-    info.buffer_bits = buffer_bits
-    info.buffer_size = get_bytes_per_bits(buffer_bits)
+state_lines = [
+    "pc  0000  sp  0000  sr  0000  cg  0000".replace('0000', hex_digits),
+    "r04 0000  r05 0000  r06 0000  r07 0000".replace('0000', hex_digits),
+    r"08 0000  r09 0000  r10 0000  r11 0000".replace('0000', hex_digits),
+    "r12 0000  r13 0000  r14 0000  r15 0000".replace('0000', hex_digits),
+]
 
-    info.data_bits = data_bits
-    info.data_size = get_bytes_per_bits(data_bits)
+file_path = path.join(root_folder, "state.txt")
 
-    info.remaining_bits = buffer_bits % data_bits
-    info.remaining_size = get_bytes_per_bits(info.remaining_bits)
+with open(file_path, "rb") as file:
+    buffer = file.read()
 
-    info.total_data_number = buffer_bits // data_bits
-    info.possible_data_number = 2 ** data_bits
-
-    # worst case
-    # maximum data count = total_data_number
-    # minimum data count = 0
-    # maximum data difference = 0
-
-    # best case
-    # minimum data count = ceil_module(total_data_number, possible_data_number)
-    # maximum data count = floor_module(total_data_number, possible_data_number)
-    # maximum data difference = 1
-
-    return info
-
-
-def print_info(info: Info, table_settings: TableSetting = None):
-    table_settings = table_settings or TableSetting(vertical_margin=1, title_align='<', row_align='>')
-    table = Table(table_settings)
-
-    table.set_titles('buffer bits', 'buffer size',
-                     'data bits', 'remaining bits',
-                     'possible data number', 'total data number')
-
-    table.add_row(*map(str, [info.buffer_bits, info.buffer_size,
-                             info.data_bits, info.remaining_bits,
-                             info.possible_data_number, info.total_data_number]))
-    table.print()
-
-
-print(generate_password())
+print(buffer.splitlines())

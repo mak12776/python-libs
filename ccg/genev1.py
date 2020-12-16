@@ -1,7 +1,7 @@
 from collections import deque
 from typing import Iterable, List, Callable
 
-from py_libs import quoted, single_quoted
+from library import quoted, single_quoted
 
 Test = str
 

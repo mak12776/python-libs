@@ -2,7 +2,7 @@ from collections import deque
 from string import digits
 from typing import Iterable
 
-from py_libs import single_quoted
+from library import single_quoted
 
 
 # classes

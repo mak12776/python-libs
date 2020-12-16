@@ -5,9 +5,9 @@ from typing import Union, Callable, Tuple, Dict, MutableSequence
 
 from sortedcontainers import SortedList
 
-from py_libs.fmt import print_separator, printf, single_quoted
-from py_libs.math import min_max_average
-from py_libs.utils import to_machine_size, to_human_size
+from library.fmt import print_separator, printf, single_quoted
+from library.math import min_max_average
+from library.utils import to_machine_size, to_human_size
 
 
 class Node:

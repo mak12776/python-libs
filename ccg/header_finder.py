@@ -3,7 +3,7 @@ from collections import deque
 from os import path, walk
 from typing import Callable
 
-from py_libs import read_file_name
+from library import read_file_name
 
 # file searcher
 
