@@ -1,10 +1,11 @@
 # allocating memory as much as needed.
-import ast
 from sys import exit, argv
+
+import requests
 
 
 def main(*args):
-    node = ast.parse('10 + 30')
+    requests.get('https://microcorruption.com')
 
 
 if __name__ == '__main__':

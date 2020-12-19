@@ -112,7 +112,6 @@ def read_dump(next_line: NextLine):
             if len(result) != 0:
                 return result
             raise LexerError(ErrorEnum.INVALID_DUMP)
-
         print(match.groups())
 
 

@@ -1,10 +1,7 @@
 import io
 import os
 import typing
-from ctypes import c_size_t, sizeof
-from typing import Union
-
-from library.utils import count_bits
+from typing import Union, Callable
 
 BinaryFile = typing.Union[typing.BinaryIO, io.RawIOBase]
 TextFile = typing.Union[typing.TextIO, io.TextIOBase]
@@ -47,17 +44,6 @@ def write_int(outfile: BinaryFile, value: int, size: int, byteorder='big', signe
     return outfile.write(value.to_bytes(size, byteorder, signed=signed))
 
 
-SIZE_OF_SIZE = sizeof(c_size_t)
-
-
-def read_size(infile: BinaryFile):
-    return read_int(infile, SIZE_OF_SIZE, byteorder='big', signed=False)
-
-
-def write_size(outfile: BinaryFile, value: int):
-    return write_int(outfile, value, SIZE_OF_SIZE, byteorder='big', signed=False)
-
-
 INITIAL_MASK = 0b0011_1111
 INITIAL_BITS = 6
 
@@ -68,7 +54,7 @@ SIGN_MASK = 0b0100_0000
 CONTINUE_MASK = 0b1000_0000
 
 
-def read_signed_big_int(infile: BinaryFile):
+def __read_big_int_signed(infile: BinaryFile):
     byte = read_int(infile, 1, byteorder='big', signed=False)
     is_negative = bool(byte & SIGN_MASK)
     value = byte & INITIAL_MASK
@@ -78,37 +64,80 @@ def read_signed_big_int(infile: BinaryFile):
     return -value if is_negative else value
 
 
-def read_unsigned_big_int(infile: BinaryFile):
+def __read_big_int_unsigned(infile: BinaryFile):
     byte = read_int(infile, 1, byteorder='big', signed=False)
+    value = byte & VALUE_MASK
+    while value & CONTINUE_MASK:
+        byte = read_int(infile, 1, byteorder='big', signed=False)
+        value = (value << VALUE_BITS) | (byte & VALUE_MASK)
+    return value
 
-def write_big_int(outfile: BinaryFile, value: int):
+
+def read_big_int(infile: BinaryFile, signed: bool = True):
+    if signed:
+        return __read_big_int_signed(infile)
+    return __read_big_int_unsigned(infile)
+
+
+def __count_unsigned_bits(value):
+    total = 8
+    while value & 0xFF00:
+        value >>= 8
+        total += 8
+    while value & 0x80 == 0:
+        value <<= 1
+        total -= 1
+    return total
+
+
+def __write_big_int_unsigned(outfile: BinaryFile, value: int):
+    _write_byte: Callable[[int], int] = lambda _byte: write_int(outfile, _byte, 1, byteorder='big', signed=False)
     if value == 0:
-        return write_int(outfile, 0, 1, byteorder='big', signed=False)
-    byte = 0
+        return _write_byte(0)
+    total_write = 0
+    # initial bits
+    bits = __count_unsigned_bits(value)
+    initial_bits = bits % VALUE_BITS
+    if initial_bits > 0:
+        bits -= initial_bits
+        total_write += _write_byte(CONTINUE_MASK | (value >> bits))
+    # other 7 bits
+    while bits > VALUE_BITS:
+        bits -= VALUE_BITS
+        total_write += _write_byte(CONTINUE_MASK | ((value >> bits) & VALUE_MASK))
+    total_write += _write_byte(value & VALUE_MASK)
+    return total_write
+
+
+def __write_big_int_signed(outfile: BinaryFile, value: int):
+    _write_byte: Callable[[int], int] = lambda _byte: write_int(outfile, _byte, 1, byteorder='big', signed=False)
+    if value == 0:
+        return _write_byte(0)
+    # remove negative sign
+    sign_byte = 0
     if value < 0:
-        byte |= SIGN_MASK
+        sign_byte = SIGN_MASK
         value = -value
     # just first 6 bits
     if value <= INITIAL_MASK:
-        byte |= value
-        return write_int(outfile, byte, 1, byteorder='big', signed=False)
-    byte |= CONTINUE_MASK
-    bits = count_bits(value)
-    # write first 6 bits
-    first_bits = bits % VALUE_BITS
-    if first_bits > 0:
-        bits -= first_bits
-        byte |= value >> bits
-    total_write = write_int(outfile, byte, 1, byteorder='big', signed=False)
+        return _write_byte(sign_byte | value)
+    # more than 6 bits
+    bits = __count_unsigned_bits(value)
+    bits -= bits % VALUE_BITS
+    total_write = _write_byte(CONTINUE_MASK | sign_byte | (value >> bits))
     # write the rest 7 bits
     while bits > VALUE_BITS:
         bits -= VALUE_BITS
-        byte = CONTINUE_MASK | ((value >> bits) & VALUE_MASK)
-        total_write += write_int(outfile, byte, 1, byteorder='big', signed=False)
+        total_write += _write_byte(CONTINUE_MASK | ((value >> bits) & VALUE_MASK))
     # write last 7 bits
-    byte = value & VALUE_MASK
-    total_write += write_int(outfile, byte, 1, byteorder='big', signed=False)
+    total_write += _write_byte(value & VALUE_MASK)
     return total_write
+
+
+def write_big_int(outfile: BinaryFile, value: int, signed=True):
+    if signed:
+        return __write_big_int_signed(outfile, value)
+    return __write_big_int_unsigned(outfile, value)
 
 
 class FileWrapper:
@@ -130,8 +159,7 @@ class FileWrapper:
         return write_int(self._file, value, size, byteorder=byteorder, signed=signed)
 
     @staticmethod
-    def open(self, name, mode='r', buffering=-1, encoding=None, errors=None, newline=None, closefd=True,
-             opener=None):
+    def open(name, mode='r', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None):
         file = open(name, mode=mode, buffering=buffering, encoding=encoding, errors=errors, newline=newline,
-                    opener=opener)
+                    closefd=closefd, opener=opener)
         return FileWrapper(file)
