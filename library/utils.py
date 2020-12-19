@@ -2,6 +2,7 @@ import re
 import sys
 import time
 from collections import deque
+from typing import Callable
 
 EXIT_NORMAL = 0
 EXIT_ERROR = 1
@@ -56,8 +57,35 @@ def to_machine_size(name: str):
     return int(integer) * (2 ** ((file_size_units.index(exp) + 1) * 10))
 
 
-def run_main(func):
-    sys.exit(func(sys.argv) or 0)
+def count_bits(value: int):
+    if value == 0:
+        return 1
+    if value < 0:
+        value = -value
+    bits = 8
+    while value & 0xFF00:
+        value >>= 8
+        bits += 8
+    while value & 0x80 == 0:
+        value <<= 1
+        bits -= 1
+    return bits
+
+
+def count_bytes(value: int):
+    if value == 0:
+        return 1
+    if value < 0:
+        value = -value
+    bytes_count = 0
+    while value & 0xFF:
+        value >>= 8
+        bytes_count += 1
+    return bytes_count
+
+
+def run_main(main: Callable[..., int or None]):
+    sys.exit(main(sys.argv) or 0)
 
 
 def get_program_name(default='main'):

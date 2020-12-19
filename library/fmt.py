@@ -6,9 +6,8 @@ def quoted(string: str, symbol: str = '"'):
     return f'{symbol}{string}{symbol}'
 
 
-def single_quoted(string: str, symbol: str = '\''):
-    string = string.replace(symbol, f'\\{symbol}')
-    return f'{symbol}{string}{symbol}'
+def single_quoted(string: str):
+    return quoted(string, symbol="'")
 
 
 def printf(string: str, *args, **kwargs):
