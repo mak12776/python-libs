@@ -1,49 +1,91 @@
 # allocating memory as much as needed.
-import re
-from os import path
+import marshal
+from enum import unique, IntFlag
+from io import BytesIO, SEEK_SET
+from sys import exit, argv
 
-folder_contents = [
-    'dump.txt',
-    'state.txt',
-    'dis.txt'
-]
+from library import io
 
-root_folder = r"D:\Codes\micro-test\Tutorial 10P"
+cache_folder = 'cache'
 
-file_path = path.join(root_folder, "dump.txt")
 
-with open(file_path, "rb") as file:
-    buffer = file.read()
+def funny_function(a, b, c, d=10, *args, hello=10):
+    """
+    it's some funny function
+    :param func:
+    :return:
+    """
+    a_new = 600
 
-lines = buffer.splitlines()
-addr_values = []
-for index in range(len(lines)):
-    m = re.match(b'([0-9a-f]{4}): {3}(\\*|(?:[0-9a-f]{4} ){8})', lines[index])
-    if m is None:
-        print(f'ERROR: {lines[index]!r} => didn\'t match pattern')
-    first = int(m.group(1), 16)
-    if m.group(2) == b'*':
-        second = 'zero'
-    else:
-        second = []
-        for item in filter(lambda s: s, m.group(2).split(b' ')):
-            second.append(item[:2])
-            second.append(item[2:])
-        second = tuple(map(lambda s: int(s, 16), second))
-    addr_values.append((int(m.group(1), 16), second))
+    def a_new_funny_function(some_num):
+        if cache_folder == 10:
+            return None
 
-hex_digits = '[0-9a-f]{4}'
+    return a_new_funny_function
 
-state_lines = [
-    "pc  0000  sp  0000  sr  0000  cg  0000".replace('0000', hex_digits),
-    "r04 0000  r05 0000  r06 0000  r07 0000".replace('0000', hex_digits),
-    r"08 0000  r09 0000  r10 0000  r11 0000".replace('0000', hex_digits),
-    "r12 0000  r13 0000  r14 0000  r15 0000".replace('0000', hex_digits),
-]
 
-file_path = path.join(root_folder, "state.txt")
+@unique
+class CodeFlags(IntFlag):
+    ARBITRARY_NUMBER_OF_POSITIONAL_ARGUMENTS_FLAG = 0x04
+    ARBITRARY_KEYWORD_ARGUMENTS_FLAG = 0x08
+    GENERATOR_FUNCTION_FLAG = 0x02
+    FUTURE_DIVISION_FLAG = 0x2000
 
-with open(file_path, "rb") as file:
-    buffer = file.read()
 
-print(buffer.splitlines())
+def dump_func_info(func):
+    code_object = func.__code__
+    print('code object:', code_object)
+    print('-' * 20)
+    print('function name:', code_object.co_name)
+    print('positional-only arguments + default values argument count:', code_object.co_argcount)
+    print('positional-only arguments count:', code_object.co_posonlyargcount)
+    print('keyword-only arguments count:', code_object.co_kwonlyargcount)
+    print('number of local variables:', code_object.co_nlocals)
+    print('names of local variables:', code_object.co_varnames)
+    print('names of free variables:', code_object.co_freevars)
+    print('names of local variables that are referenced by nested function:', code_object.co_cellvars)
+    print('sequence of byte code instructions:', code_object.co_code)
+    print('literals used by bytecode:', code_object.co_consts)
+    print('names used by bytecode:', code_object.co_names)
+    print('code file name:', code_object.co_filename)
+    print('first line number of function:', code_object.co_firstlineno)
+    print('mapping from bytecode offsets to line numbers:', code_object.co_lnotab)
+    print('required stack size:', code_object.co_stacksize)
+    print('flags:', CodeFlags(code_object.co_flags))
+    print('-' * 10)
+    func = funny_function
+    # ---
+    func_dump = marshal.dumps(func.__code__, 4)
+    func_copy = marshal.loads(func_dump)
+    print('marshal dumps:', func_dump)
+    print('marshal loads:', func_copy)
+    print('function code:', func.__code__)
+    print('hash:', hash(func_dump))
+    print('func_copy hash:')
+    print('func_copy == func:', func_copy == func)
+
+
+def slow_bits_count(num: int):
+    if num == 0:
+        return 1
+    if num < 0:
+        return len(bin(num)) - 3
+    return len(bin(num)) - 2
+
+
+def main(*args):
+    for num in range(-0xFFFF, 0xFFFF + 1):
+        buffer = BytesIO()
+        io.write_big_int(buffer, num)
+        buffer.seek(0, SEEK_SET)
+        num_copy = io.read_big_int(buffer)
+        if num != num_copy:
+            buffer_hex = ''.join(hex(value) for value in buffer.getvalue())
+            print('buffer:', buffer_hex)
+            print(f'value error: {num}, {bin(num)} != {num_copy}')
+            return
+    print('all success.')
+
+
+if __name__ == '__main__':
+    exit(main(argv))
