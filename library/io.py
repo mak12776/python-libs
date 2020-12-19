@@ -58,49 +58,55 @@ def write_size(outfile: BinaryFile, value: int):
     return write_int(outfile, value, SIZE_OF_SIZE, byteorder='big', signed=False)
 
 
-BIG_INT_INITIAL_MASK = 0b0011_1111
-BIG_INT_SIGN_MASK = 0b0100_0000
-BIG_INT_VALUE_MASK = 0b0111_1111
-BIG_INT_CONTINUE_MASK = 0b1000_0000
-BIG_INT_INITIAL_BITS = 6
-BIG_INT_VALUE_BITS = 7
+INITIAL_MASK = 0b0011_1111
+INITIAL_BITS = 6
+
+VALUE_MASK = 0b0111_1111
+VALUE_BITS = 7
+
+SIGN_MASK = 0b0100_0000
+CONTINUE_MASK = 0b1000_0000
 
 
-def read_big_int(infile: BinaryFile):
+def read_signed_big_int(infile: BinaryFile):
     byte = read_int(infile, 1, byteorder='big', signed=False)
-    is_negative = bool(byte & BIG_INT_SIGN_MASK)
-    value = byte & BIG_INT_INITIAL_MASK
-    while byte & BIG_INT_CONTINUE_MASK:
+    is_negative = bool(byte & SIGN_MASK)
+    value = byte & INITIAL_MASK
+    while byte & CONTINUE_MASK:
         byte = read_int(infile, 1, byteorder='big', signed=False)
-        value = (value << BIG_INT_VALUE_BITS) | (byte & BIG_INT_VALUE_MASK)
+        value = (value << VALUE_BITS) | (byte & VALUE_MASK)
     return -value if is_negative else value
 
+
+def read_unsigned_big_int(infile: BinaryFile):
+    byte = read_int(infile, 1, byteorder='big', signed=False)
 
 def write_big_int(outfile: BinaryFile, value: int):
     if value == 0:
         return write_int(outfile, 0, 1, byteorder='big', signed=False)
     byte = 0
     if value < 0:
-        byte |= BIG_INT_SIGN_MASK
+        byte |= SIGN_MASK
         value = -value
-    # just initial bits
-    if value <= BIG_INT_INITIAL_MASK:
+    # just first 6 bits
+    if value <= INITIAL_MASK:
         byte |= value
         return write_int(outfile, byte, 1, byteorder='big', signed=False)
-    byte |= BIG_INT_CONTINUE_MASK
-    # write first byte
+    byte |= CONTINUE_MASK
     bits = count_bits(value)
-    first_bits = bits % BIG_INT_VALUE_BITS
+    # write first 6 bits
+    first_bits = bits % VALUE_BITS
     if first_bits > 0:
         bits -= first_bits
         byte |= value >> bits
     total_write = write_int(outfile, byte, 1, byteorder='big', signed=False)
-    # write the rest
-    while bits > BIG_INT_VALUE_BITS:
-        bits -= BIG_INT_VALUE_BITS
-        byte = BIG_INT_CONTINUE_MASK | ((value >> bits) & BIG_INT_VALUE_MASK)
+    # write the rest 7 bits
+    while bits > VALUE_BITS:
+        bits -= VALUE_BITS
+        byte = CONTINUE_MASK | ((value >> bits) & VALUE_MASK)
         total_write += write_int(outfile, byte, 1, byteorder='big', signed=False)
-    byte = value & BIG_INT_VALUE_MASK
+    # write last 7 bits
+    byte = value & VALUE_MASK
     total_write += write_int(outfile, byte, 1, byteorder='big', signed=False)
     return total_write
 
