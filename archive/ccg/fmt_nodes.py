@@ -2,10 +2,9 @@ from collections import deque
 from string import digits
 from typing import Iterable
 
-from library import single_quoted
-
-
 # classes
+from library.fmt import single_quoted
+
 
 class Test:
     __slots__ = 'test', 'target'
