@@ -7,9 +7,9 @@ from io import RawIOBase
 from typing import Union
 
 import numpy
-
-from library.io import get_file_size
 from library.table import TableSetting, Table
+
+from library.sio import get_file_size
 from library.utils import to_machine_size, to_human_size
 
 file_size = get_file_size('music_for_programming_49-julien_mier.mp3')

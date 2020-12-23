@@ -2,7 +2,7 @@ import json
 from os import path
 from typing import Tuple, Callable, Any
 
-from library.io import BinaryFile
+from library.sio import BinaryFile
 
 ReadWrite = Tuple[Callable[[BinaryFile], Any], Callable[[Any, BinaryFile], None]]
 

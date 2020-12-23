@@ -4,7 +4,7 @@ from os import path, walk
 from typing import Callable
 
 # file searcher
-from library.io import read_file_name
+from library.sio import read_file_name
 
 scl_root_path = '..\\cpp-libs\\cpp-libs\\scl'
 header_name = 'fmt.h'
