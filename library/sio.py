@@ -5,6 +5,8 @@ from typing import Union, Callable
 
 BinaryFile = typing.Union[typing.BinaryIO, io.RawIOBase]
 TextFile = typing.Union[typing.TextIO, io.TextIOBase]
+AnyFile = typing.Union[BinaryFile, TextFile]
+BufferType = Union[bytes, bytearray]
 
 
 def get_file_size(file_or_name: Union[BinaryFile, str]):
@@ -140,11 +142,32 @@ def write_big_int(outfile: BinaryFile, value: int, signed=True):
     return __write_big_int_unsigned(outfile, value)
 
 
+def read_bytes(infile: BinaryFile, size_of_size: int):
+    return infile.read(read_int(infile, size_of_size, byteorder='big', signed=False))
+
+
+def write_bytes(outfile: BinaryFile, buffer: BufferType, size_of_size: int):
+    total = outfile.write(len(buffer).to_bytes(size_of_size, byteorder='big', signed=False))
+    return total + outfile.write(buffer)
+
+
+def read_big_bytes(infile: BinaryFile):
+    return infile.read(read_big_int(infile, signed=False))
+
+
+def write_big_bytes(outfile: BinaryFile, buffer: BufferType):
+    total = write_big_int(outfile, len(buffer), signed=False)
+    return total + outfile.write(buffer)
+
+
 class FileWrapper:
     __slots__ = '_file'
 
-    def __init__(self, file):
+    def __init__(self, file: AnyFile):
         self._file = file
+
+    def get_file(self):
+        return self._file
 
     def __enter__(self):
         return self
@@ -157,6 +180,24 @@ class FileWrapper:
 
     def write_int(self, value, size: int, byteorder='big', signed: bool = False):
         return write_int(self._file, value, size, byteorder=byteorder, signed=signed)
+
+    def read_big_int(self, signed=True):
+        return read_big_int(self._file, signed=signed)
+
+    def write_big_int(self, value: int, signed=True):
+        return write_big_int(self._file, value, signed=signed)
+
+    def read_bytes(self, size_of_size: int):
+        return read_bytes(self._file, size_of_size)
+
+    def write_bytes(self, buffer: BufferType, size_of_size: int):
+        return write_bytes(self._file, buffer, size_of_size)
+
+    def read_big_bytes(self):
+        return read_big_bytes(self._file)
+
+    def write_big_bytes(self, buffer: BufferType):
+        return write_big_bytes(self._file, buffer)
 
     @staticmethod
     def open(name, mode='r', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None):

@@ -2,7 +2,7 @@ import re
 import sys
 import time
 from collections import deque
-from typing import Callable
+from typing import Callable, Iterable
 
 EXIT_NORMAL = 0
 EXIT_ERROR = 1
@@ -23,6 +23,22 @@ def class_lookup(_cls):
 
 def chr_range(*args):
     return map(chr, range(*map(ord, args)))
+
+
+class IterableCache:
+    __slots__ = 'iterator', 'cache'
+
+    def __init__(self, iterable: Iterable):
+        self.iterator = iter(iterable)
+        self.cache = deque()
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        if self.cache:
+            return self.cache.pop()
+        return next(self.iterator)
 
 
 class DotDict(dict):

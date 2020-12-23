@@ -1,12 +1,13 @@
 # allocating memory as much as needed.
-from sys import exit, argv
 
-import requests
-
-
-def main(*args):
-    requests.get('https://microcorruption.com')
-
-
-if __name__ == '__main__':
-    exit(main(argv))
+# with open('library/sio.py', mode='rb') as infile:
+#     text = infile.read()
+#
+# node = ast.parse(text, mode='exec')
+# read_write_functions = []
+#
+# for item in node.body:
+#     if isinstance(item, ast.FunctionDef):
+#         if re.match('(?:read|write)_(?!(?:file|file_name))', item.name):
+#             read_write_functions.append(item)
+# print(ast.dump(read_write_functions[0], indent=4))
