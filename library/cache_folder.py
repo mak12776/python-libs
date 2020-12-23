@@ -1,8 +1,11 @@
+import dataclasses
 import marshal
 from enum import IntEnum, auto
 from itertools import count
 from os.path import join
 from typing import Callable, Dict, Tuple
+
+from traitlets import Any
 
 from library.sio import FileWrapper, read_int, BufferType
 
@@ -32,6 +35,13 @@ class DataType(IntEnum):
     FUNCTION = auto()
     TITLE = auto()
     GET_REQUEST = auto()
+
+
+@dataclasses.dataclass(init=True, repr=True, eq=False)
+class ReadWriteWrapper:
+    __slots__ = 'read', 'write'
+    read: Callable[[FileWrapper], Any]
+    write: Callable[[FileWrapper, Any], int]
 
 
 class CacheFolder:
@@ -64,9 +74,8 @@ class CacheFolder:
                 total += wrapper.write_big_bytes(value)  # file index
         return total
 
-    @staticmethod
-    def __format_data_name(index: int):
-        return f'{hex(index)[2:]}.data'
+    def __format_path(self, index: int):
+        return join(self._root_path, f'{hex(index)[2:]}.data')
 
     @staticmethod
     def __search_new_index(data_dict: Dict):
@@ -77,19 +86,28 @@ class CacheFolder:
 
     def __write_new_index_and_container(self, data_dict: Dict, key: Tuple[DataType, bytes], buffer: BufferType):
         new_index = data_dict[key] = CacheFolder.__search_new_index(data_dict)
-        data_dict[key] = new_index
         self.__write_file_index(new_index, buffer)
         self.__write_container(data_dict)
 
     def __read_file_index(self, index: int):
-        path = join(self._root_path, CacheFolder.__format_data_name(index))
+        path = self.__format_path(index)
         with open(path, 'rb') as infile:
             return infile.read()
 
     def __write_file_index(self, index: int, buffer: BufferType):
-        path = join(self._root_path, CacheFolder.__format_data_name(index))
+        path = self.__format_path(index)
         with open(path, 'wb') as outfile:
             return outfile.write(buffer)
+
+    def __read_file_index_call_back(self, index: int, rw: ReadWriteWrapper):
+        path = self.__format_path(index)
+        with FileWrapper.open(path, 'rb') as wrapper:
+            return rw.read(wrapper)
+
+    def __write_file_index_call_back(self, index: int, rw: ReadWriteWrapper, instance: Any):
+        path = self.__format_path(index)
+        with FileWrapper.open(path, 'rb') as wrapper:
+            return rw.write(wrapper, instance)
 
     def cached_call(self, func: Callable[..., bytes], *args, **kwargs):
         func_codes = marshal.dumps(func, MARSHAL_VERSION)
@@ -97,11 +115,23 @@ class CacheFolder:
         key = (DataType.FUNCTION, func_codes)
         try:
             index = data_dict[key]
-            return self.__read_file_index(index)
         except KeyError:
             func_data = func(*args, **kwargs)
             self.__write_new_index_and_container(data_dict, key, func_data)
             return func_data
+        return self.__read_file_index(index)
+
+    def cached_object_call(self, rw: ReadWriteWrapper, func: Callable, *args, **kwargs):
+        func_codes = marshal.dumps(func, MARSHAL_VERSION)
+        data_dict = self.__read_container()
+        key = (DataType.FUNCTION, func_codes)
+        try:
+            index = data_dict[key]
+        except KeyError:
+            instance = func(*args, **kwargs)
+
+            return None
+        return self.__read_file_index_call_back(index, rw)
 
     def cache_title(self, title: str, buffer: BufferType):
         data_dict = self.__read_container()
