@@ -1,11 +1,12 @@
 import secrets
+import sys
 from collections import defaultdict
 from dataclasses import dataclass
-from typing import Callable, Union, Tuple
+from typing import Callable, Union, Tuple, Dict
 
 from sortedcontainers import SortedList
 
-from library import math
+from library.math import ceil_module
 from library.sio import FileWrapper
 from library.utils import to_machine_size, StopWatch
 
@@ -33,7 +34,7 @@ def get_buffer(buffer_info: BufferInfo):
 
 
 def get_bytes_per_bits(bits: int):
-    return math.upper_bound(bits, 8)
+    return ceil_module(bits, 8)
 
 
 DataType = int
@@ -42,7 +43,7 @@ DataType = int
 @dataclass(init=True, repr=True, eq=False)
 class DataCount:
     __slots__ = 'data', 'count'
-    data: bytes
+    data: int
     count: int
 
 
@@ -50,6 +51,7 @@ int_settings = {
     'byteorder': 'big',
     'signed': False,
 }
+DEFAULT_INT_SIZE = 4
 
 
 class SegmentedBuffer:
@@ -71,6 +73,14 @@ class SegmentedBuffer:
 
         self.remaining = None
 
+    def dump_values(self):
+        return f'buffer: {self.buffer_bits} bits ({self.buffer_size} bytes)\n' + \
+               f'data: {self.data_bits} bits ({self.data_size} bytes)\n' + \
+               f'remaining: {self.remaining_bits} bits ({self.remaining_size} bytes)\n'
+
+    def print_values(self, file=sys.stdout):
+        print(self.dump_values(), file=file)
+
     def _count_bytes(self, buffer: bytes):
         max_index = self.buffer_size - self.remaining_size
         count_dict = defaultdict(lambda: 1)
@@ -78,31 +88,53 @@ class SegmentedBuffer:
             count_dict[buffer[index:index + self.data_size]] += 1
         return count_dict
 
+    def _count_ints(self, buffer: bytes):
+        if self.data_bits == 8:
+            count_dict = defaultdict(lambda: 1)
+            for value in buffer:
+                count_dict[value] += 1
+        else:
+            max_index = self.buffer_size - self.remaining_size
+            count_dict = defaultdict(lambda: 1)
+            for index in range(0, max_index, self.data_size):
+                count_dict[int.from_bytes(buffer[index:index + self.data_size], byteorder='big', signed=False)] += 1
+        return count_dict
+
     @staticmethod
-    def _sort_count_dict(count_dict):
-        return SortedList((DataCount(key, value) for key, value in count_dict), key=lambda item: item.count)
+    def _sort_count_dict(count_dict: Dict):
+        return SortedList((DataCount(key, value) for key, value in count_dict.items()), key=lambda item: item.count)
+
+    @staticmethod
+    def _read_sorted_count(wrapper: FileWrapper, int_size: int):
+        length = wrapper.read_int(int_size, **int_settings)
+        result = SortedList()
+        for step in range(length):
+            raise BaseException('incomplete code')
+        return result
 
     def read(self, wrapper: FileWrapper):
-        size = wrapper.read_int(1, byteorder='big', signed=False)
-        self.buffer_size = wrapper.read_int(size, **int_settings)
-        self.buffer_bits = wrapper.read_int(size, **int_settings)
-        self.data_size = wrapper.read_int(size, **int_settings)
-        self.data_bits = wrapper.read_int(size, **int_settings)
+        int_size = wrapper.read_int(1, byteorder='big', signed=False)
+        self.buffer_size = wrapper.read_int(int_size, **int_settings)
+        self.buffer_bits = wrapper.read_int(int_size, **int_settings)
+        self.data_size = wrapper.read_int(int_size, **int_settings)
+        self.data_bits = wrapper.read_int(int_size, **int_settings)
         # read sorted count list
-        self.remaining_size = wrapper.read_int(size, **int_settings)
-        self.remaining_bits = wrapper.read_int(size, **int_settings)
-        # read remaining
 
-    def write(self, wrapper: FileWrapper, size: int = 4):
-        wrapper.write_int(size, 1, byteorder='big', signed=False)
-        wrapper.write_int(self.buffer_size, size, **int_settings)
-        wrapper.write_int(self.buffer_bits, size, **int_settings)
-        wrapper.write_int(self.data_size, size, **int_settings)
-        wrapper.write_int(self.data_bits, size, **int_settings)
+        # read remaining
+        self.remaining_size = wrapper.read_int(int_size, **int_settings)
+        self.remaining_bits = wrapper.read_int(int_size, **int_settings)
+
+    def write(self, wrapper: FileWrapper, int_size: int = 4):
+        wrapper.write_int(int_size, 1, byteorder='big', signed=False)
+        wrapper.write_int(self.buffer_size, int_size, **int_settings)
+        wrapper.write_int(self.buffer_bits, int_size, **int_settings)
+        wrapper.write_int(self.data_size, int_size, **int_settings)
+        wrapper.write_int(self.data_bits, int_size, **int_settings)
         # write sorted count list
-        wrapper.write_int(self.remaining_size, size, **int_settings)
-        wrapper.write_int(self.remaining_bits, size, **int_settings)
+
         # write remaining
+        wrapper.write_int(self.remaining_size, int_size, **int_settings)
+        wrapper.write_int(self.remaining_bits, int_size, **int_settings)
 
     @staticmethod
     def static_read(wrapper: FileWrapper):
@@ -112,14 +144,25 @@ class SegmentedBuffer:
 
     @staticmethod
     def static_write(wrapper: FileWrapper, instance: 'SegmentedBuffer', size: int = 4):
-        return instance.write(wrapper, size=size)
+        return instance.write(wrapper, int_size=size)
 
-    def scan_buffer(self, buffer: bytes, data_bits: int):
+    def scan_buffer(self, data_bits: int, buffer: bytes, method: str):
         self.buffer_size = len(buffer)
         self.buffer_bits = self.buffer_size * 8
 
         self.data_bits = data_bits
         self.data_size = get_bytes_per_bits(data_bits)
 
-        self.remaining_bits = self.buffer_bits // self.data_bits
+        self.remaining_bits = self.buffer_bits % self.data_bits
         self.remaining_size = get_bytes_per_bits(self.remaining_bits)
+
+        if data_bits % 8 == 0:
+            if method == 'ints':
+                count_dict = self._count_ints(buffer)
+            elif method == 'bytes':
+                count_dict = self._count_bytes(buffer)
+            else:
+                raise ValueError
+        else:
+            raise BaseException('incomplete error')
+        self.sorted_counts = SegmentedBuffer._sort_count_dict(count_dict)

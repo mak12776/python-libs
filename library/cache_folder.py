@@ -44,6 +44,9 @@ class ReadWriteWrapper:
     write: Callable[[FileWrapper, Any], int]
 
 
+KeyType = Tuple[DataType, bytes]
+
+
 class CacheFolder:
     __slots__ = '_root_path', '_container_name'
 
@@ -77,18 +80,6 @@ class CacheFolder:
     def __format_path(self, index: int):
         return join(self._root_path, f'{hex(index)[2:]}.data')
 
-    @staticmethod
-    def __search_new_index(data_dict: Dict):
-        for data_index, index in zip(data_dict.values(), count()):
-            if data_index != index:
-                return index
-        return 0
-
-    def __write_new_index_and_container(self, data_dict: Dict, key: Tuple[DataType, bytes], buffer: BufferType):
-        new_index = data_dict[key] = CacheFolder.__search_new_index(data_dict)
-        self.__write_file_index(new_index, buffer)
-        self.__write_container(data_dict)
-
     def __read_file_index(self, index: int):
         path = self.__format_path(index)
         with open(path, 'rb') as infile:
@@ -109,29 +100,55 @@ class CacheFolder:
         with FileWrapper.open(path, 'rb') as wrapper:
             return rw.write(wrapper, instance)
 
-    def cached_call(self, func: Callable[..., bytes], *args, **kwargs):
-        func_codes = marshal.dumps(func, MARSHAL_VERSION)
-        data_dict = self.__read_container()
-        key = (DataType.FUNCTION, func_codes)
-        try:
-            index = data_dict[key]
-        except KeyError:
-            func_data = func(*args, **kwargs)
-            self.__write_new_index_and_container(data_dict, key, func_data)
-            return func_data
-        return self.__read_file_index(index)
+    @staticmethod
+    def __search_new_index(data_dict: Dict):
+        for data_index, index in zip(data_dict.values(), count()):
+            if data_index != index:
+                return index
+        return 0
 
-    def cached_object_call(self, rw: ReadWriteWrapper, func: Callable, *args, **kwargs):
-        func_codes = marshal.dumps(func, MARSHAL_VERSION)
-        data_dict = self.__read_container()
-        key = (DataType.FUNCTION, func_codes)
-        try:
-            index = data_dict[key]
-        except KeyError:
-            instance = func(*args, **kwargs)
+    def __write_new_index_and_container(self, data_dict: Dict, key: KeyType, buffer: BufferType):
+        new_index = data_dict[key] = CacheFolder.__search_new_index(data_dict)
+        self.__write_file_index(new_index, buffer)
+        self.__write_container(data_dict)
 
-            return None
-        return self.__read_file_index_call_back(index, rw)
+    def __write_new_index_and_container_call_back(self, data_dict: Dict, key: KeyType, rw: ReadWriteWrapper, instance):
+        new_index = data_dict[key] = CacheFolder.__search_new_index(data_dict)
+        self.__write_file_index_call_back(new_index, rw, instance)
+        self.__write_container(data_dict)
+
+    def cached_call(self, func: Callable[..., bytes]):
+        def __wrapper(*args, **kwargs):
+            func_codes = marshal.dumps(func, MARSHAL_VERSION)
+            data_dict = self.__read_container()
+            key = (DataType.FUNCTION, func_codes)
+            try:
+                index = data_dict[key]
+            except KeyError:
+                func_data = func(*args, **kwargs)
+                self.__write_new_index_and_container(data_dict, key, func_data)
+                return func_data
+            return self.__read_file_index(index)
+
+        return __wrapper
+
+    def cached_object_call(self, rw: ReadWriteWrapper):
+        def __decorator(func: Callable):
+            def __wrapper(*args, **kwargs):
+                func_codes = marshal.dumps(func, MARSHAL_VERSION)
+                data_dict = self.__read_container()
+                key = (DataType.FUNCTION, func_codes)
+                try:
+                    index = data_dict[key]
+                except KeyError:
+                    instance = func(*args, **kwargs)
+                    self.__write_new_index_and_container_call_back(data_dict, key, rw, instance)
+                    return instance
+                return self.__read_file_index_call_back(index, rw)
+
+            return __wrapper
+
+        return __decorator
 
     def cache_title(self, title: str, buffer: BufferType):
         data_dict = self.__read_container()

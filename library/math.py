@@ -10,11 +10,11 @@ def lower_bound(value: int, divisor: int):
 
 
 def ceil_module(value: int, divisor: int):
-    return value // divisor
+    return (value // divisor) + (1 if value % divisor else 0)
 
 
 def floor_module(value: int, divisor: int):
-    return (value // divisor) + (1 if value % divisor else 0)
+    return value // divisor
 
 
 def min_max_average(numbers):

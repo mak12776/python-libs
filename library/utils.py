@@ -112,21 +112,34 @@ program_name = get_program_name()
 
 
 class StopWatch:
-    __slots__ = 'now', 'start_time', 'laps'
+    __slots__ = '_now', '_start_time', '_laps'
 
     def __init__(self, start: bool = False, now=None):
-        self.now = now or time.perf_counter
-        self.start_time = self.now() if start else 0
-        self.laps = deque()
+        self._now = now or time.perf_counter
+        self._start_time = self._now() if start else 0
+        self._laps = deque()
 
     def start(self):
-        self.start_time = self.now()
+        self._start_time = self._now()
 
     def lap(self):
-        self.laps.append(self.now())
+        self._laps.append(self._now())
+
+    @property
+    def laps(self):
+        return self._laps
+
+    @property
+    def differences(self):
+        last = self._start_time
+        result = list()
+        for _next in self._laps:
+            result.append(_next - last)
+            last = _next
+        return result
 
     def print(self):
-        start = self.start_time
-        for num, lap in enumerate(self.laps, 1):
+        start = self._start_time
+        for num, lap in enumerate(self._laps, 1):
             print(f'lap {num}: {lap - start:.10f}')
             start = lap
