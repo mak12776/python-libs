@@ -34,6 +34,7 @@ def read_file_name(path: str):
         return read_file(infile, path)
 
 
+# read, write
 def read_int(infile: BinaryFile, size: int, byteorder='big', signed=False):
     buffer = infile.read(size)
     if len(buffer) != size:
@@ -46,6 +47,7 @@ def write_int(outfile: BinaryFile, value: int, size: int, byteorder='big', signe
     return outfile.write(value.to_bytes(size, byteorder, signed=signed))
 
 
+# read, write big int
 INITIAL_MASK = 0b0011_1111
 INITIAL_BITS = 6
 
@@ -142,6 +144,7 @@ def write_big_int(outfile: BinaryFile, value: int, signed=True):
     return __write_big_int_unsigned(outfile, value)
 
 
+# read, write bytes
 def read_bytes(infile: BinaryFile, size_of_size: int):
     return infile.read(read_int(infile, size_of_size, byteorder='big', signed=False))
 
@@ -151,6 +154,7 @@ def write_bytes(outfile: BinaryFile, buffer: BufferType, size_of_size: int):
     return total + outfile.write(buffer)
 
 
+# read, write big bytes
 def read_big_bytes(infile: BinaryFile):
     return infile.read(read_big_int(infile, signed=False))
 
@@ -175,24 +179,28 @@ class FileWrapper:
     def __exit__(self, exc_type, exc_val, exc_tb):
         self._file.close()
 
+    # read, write int
     def read_int(self, size: int, byteorder: str = 'big', signed: bool = False):
         return read_int(self._file, size, byteorder=byteorder, signed=signed)
 
     def write_int(self, value, size: int, byteorder='big', signed: bool = False):
         return write_int(self._file, value, size, byteorder=byteorder, signed=signed)
 
+    # read, write big int
     def read_big_int(self, signed=True):
         return read_big_int(self._file, signed=signed)
 
     def write_big_int(self, value: int, signed=True):
         return write_big_int(self._file, value, signed=signed)
 
+    # read, write bytes
     def read_bytes(self, size_of_size: int):
         return read_bytes(self._file, size_of_size)
 
     def write_bytes(self, buffer: BufferType, size_of_size: int):
         return write_bytes(self._file, buffer, size_of_size)
 
+    # read, write big bytes
     def read_big_bytes(self):
         return read_big_bytes(self._file)
 
