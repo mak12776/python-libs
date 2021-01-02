@@ -2,7 +2,7 @@ import re
 import sys
 import time
 from collections import deque
-from typing import Callable, Iterable
+from typing import Callable, Iterable, Any
 
 EXIT_NORMAL = 0
 EXIT_ERROR = 1
@@ -109,15 +109,18 @@ def get_program_name(default='main'):
 
 
 program_name = get_program_name()
+_default_time_func = time.perf_counter
+_default_time_format = '.10f'
 
 
 class StopWatch:
-    __slots__ = '_now', '_start_time', '_laps'
+    __slots__ = '_now', '_start_time', '_laps', '_format'
 
-    def __init__(self, start: bool = False, now=None):
-        self._now = now or time.perf_counter
+    def __init__(self, start: bool = False, now: Callable[[], Any] = None, time_format: str = None):
+        self._now = now or _default_time_func
         self._start_time = self._now() if start else 0
         self._laps = deque()
+        self._format = time_format or _default_time_format
 
     def start(self):
         self._start_time = self._now()
@@ -138,8 +141,43 @@ class StopWatch:
             last = _next
         return result
 
-    def print(self):
+    def print(self, file=sys.stdout):
         start = self._start_time
         for num, lap in enumerate(self._laps, 1):
-            print(f'lap {num}: {lap - start:.10f}')
+            print(f'lap {num}: {lap - start:{self._format}}', file=file)
+            start = lap
+
+
+class StopWatchLogger:
+    __slots__ = '_now', '_start_time', '_laps', '_format'
+
+    def __init__(self, start: bool = False, now: Callable[[], Any] = None, time_format: str = None):
+        self._now = now or _default_time_func
+        self._start_time = now() if start else 0
+        self._laps = deque()
+        self._format = time_format or _default_time_format
+
+    def start(self):
+        self._start_time = self._now()
+
+    def lap(self, message: str):
+        self._laps.append((self._now(), message))
+
+    @property
+    def laps(self):
+        return self._laps
+
+    @property
+    def differences(self):
+        last = self._start_time
+        result = list()
+        for _next in self._laps:
+            result.append(_next - last)
+            last = _next
+        return result
+
+    def print(self, file=sys.stdout):
+        start = self._start_time
+        for num, (lap, log) in enumerate(self._laps, 1):
+            print(f'{lap - start:{self._format}}: {log}', file=file)
             start = lap

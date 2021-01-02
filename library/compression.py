@@ -7,8 +7,8 @@ from typing import Callable, Union, Tuple, Dict
 
 from sortedcontainers import SortedList
 
-from library.math import ceil_module
-from library.sio import FileWrapper, AnyFile
+from library.math import ceil_module, upper_bound, lower_bound
+from library.sio import AnyFile, FileWrapper
 from library.utils import to_machine_size, StopWatch
 
 RandBytes = Callable[[int], bytes]
@@ -63,6 +63,10 @@ def _from_bytes(value: bytes):
     return int.from_bytes(value, byteorder='big', signed=False)
 
 
+def _from_bytes_and_bits(value: bytes):
+    return int.from_bytes(value, byteorder='big', signed=False), len(value) * 8
+
+
 def _mask(width: int):
     return (1 << width) - 1
 
@@ -77,6 +81,45 @@ class Method(IntEnum):
     UNDEFINED = auto()
     INT = auto()
     BYTE = auto()
+
+
+class _BitReader:
+    __slots__ = ('_buffer', '_data_bits', '_data_size', '_full_read_bits',
+                 '_index', '_max_index',
+                 '_read_value', '_remaining_bits',)
+
+    def __init__(self, buffer: bytes, bits: int):
+        if bits <= 0:
+            raise ValueError(f'invalid bits: {bits}')
+        self._buffer = buffer
+        self._data_bits = bits
+        self._data_size = get_bytes_per_bits(bits)
+        self._full_read_bits = upper_bound(bits, 8)
+
+        self._max_index = lower_bound(len(buffer), self._data_size)
+        self._index = 0
+        self._read_value = _from_bytes(buffer[0:self._data_size])
+        self._remaining_bits = len(buffer) * 8 if self._max_index == 0 else self._full_read_bits
+
+    def read_bits(self):
+        if self._data_bits == self._remaining_bits:
+            value = self._read_value
+            self._read_value = 0
+            self._remaining_bits = 0
+            return value
+        if self._data_bits < self._remaining_bits:
+            self._remaining_bits -= self._data_bits
+            value = self._read_value >> self._remaining_bits
+            self._read_value &= _mask(self._remaining_bits)
+            return value
+        elif self._index < self._max_index:
+            necessary_bits = (self._data_bits - self._remaining_bits)
+            value = self._read_value << necessary_bits
+            self._read_value = _from_bytes(self._buffer[self._index: self._index + self._data_size])
+            self._remaining_bits = self._full_read_bits - necessary_bits
+            self._index += self._data_size
+            value |= self._read_value >> self._remaining_bits
+            self._read_value &= _mask(self._remaining_bits)
 
 
 class SegmentedBuffer:
@@ -110,7 +153,7 @@ class SegmentedBuffer:
         _print_bits_size('buffer', self.buffer_bits, self.buffer_size, file=file)
         _print_bits_size('data', self.data_bits, self.data_size, file=file)
 
-        if self.method == 'ints':
+        if self.method == Method.INT:
             def print_data_count(item: DataCount):
                 return print(f'-\t{item.data:0>{self.data_bits}b}: {item.count}', file=file)
         else:
@@ -120,7 +163,7 @@ class SegmentedBuffer:
             print_data_count(data_count)
 
         _print_bits_size('remaining', self.remaining_bits, self.remaining_size, file=file)
-        if self.method == 'ints':
+        if self.method == Method.INT:
             print(f'-\t{self.remaining:0>{self.remaining_bits}b}')
 
     # read, write methods
@@ -225,7 +268,6 @@ class SegmentedBuffer:
                 return count_dict, _from_bytes(buffer[max_index:])
             else:
                 raise ValueError(f'{self.data_bits} data bits is not supported in INT method')
-        pass
 
     @staticmethod
     def _sort_count_dict(count_dict: Dict):
@@ -247,6 +289,7 @@ class SegmentedBuffer:
                 return count_dict, _from_bytes(buffer)
             full_read_bits = self.data_size * 8
             residual_size = self.buffer_size % self.data_size
+
             # read first data bits
             read_value = _from_bytes(buffer[0: 0 + self.data_size])
             residual_bits = full_read_bits
@@ -254,6 +297,7 @@ class SegmentedBuffer:
                 residual_bits -= self.data_bits
                 count_dict[read_value >> residual_bits] += 1
                 read_value &= _mask(residual_bits)
+
             # read rest data bits
             max_index = self.buffer_size - residual_size
             index = self.data_size
@@ -273,6 +317,7 @@ class SegmentedBuffer:
                     read_value &= _mask(residual_bits)
                 # inc index
                 index += self.data_size
+
             if residual_size:
                 full_read_bits = self.remaining_size * 8
                 read_value = (read_value << full_read_bits) | _from_bytes(buffer[max_index:])

@@ -3,6 +3,8 @@ import os
 import typing
 from typing import Union, Callable
 
+from library.math import ceil_module
+
 BinaryFile = typing.Union[typing.BinaryIO, io.RawIOBase]
 TextFile = typing.Union[typing.TextIO, io.TextIOBase]
 AnyFile = typing.Union[BinaryFile, TextFile]
@@ -162,6 +164,42 @@ def read_big_bytes(infile: BinaryFile):
 def write_big_bytes(outfile: BinaryFile, buffer: BufferType):
     total = write_big_int(outfile, len(buffer), signed=False)
     return total + outfile.write(buffer)
+
+
+def bits_mask(width: int):
+    return (1 << width) - 1
+
+
+def _bits_io_from_bytes(buffer: bytes):
+    return int.from_bytes(buffer, byteorder='big', signed=False)
+
+
+class BitsIO:
+    __slots__ = '_buffer', '_remaining_bits', '_index', '_bit_index'
+
+    def __init__(self, buffer: Union[bytes, bytearray], bits: int = None):
+        self._buffer = buffer
+        self._remaining_bits = bits or len(buffer)
+        self._index = 0
+        self._bit_index = 0
+
+    @property
+    def remaining_bits(self):
+        return self._remaining_bits
+
+    def read(self, width: int):
+        if width > self._remaining_bits:
+            raise EOFError('remaining bits is not enough.')
+        read_bits = self._bit_index + width
+        read_size = ceil_module(read_bits, 8)
+
+        self._bit_index = read_bits % 8
+
+        read_value = (_bits_io_from_bytes(self._buffer[self._index:self._index + read_size]) >>
+                      (read_size * 8 - read_bits)) & bits_mask(width)
+
+        read_size = ceil_module(read_bits, 8)
+        return
 
 
 class FileWrapper:
