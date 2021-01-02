@@ -267,7 +267,21 @@ class SegmentedBuffer:
                     count_dict[_from_bytes(buffer[index:index + self.data_size])] += 1
                 return count_dict, _from_bytes(buffer[max_index:])
             else:
-                raise ValueError(f'{self.data_bits} data bits is not supported in INT method')
+                if self.buffer_bits < self.data_bits:
+                    return count_dict, _from_bytes(buffer)
+                full_raed_bits = self.data_size * 8
+                # read first bits
+                read_value = _from_bytes(buffer[0: self.data_size])
+                residual_bits = full_raed_bits
+                while residual_bits >= self.data_bits:
+                    residual_bits -= self.data_bits
+                    count_dict[read_value >> residual_bits] += 1
+                    read_value &= _mask(residual_bits)
+                # read rest of bits
+                max_index = self.buffer_size - (self.buffer_size - self.data_size)
+                index = self.data_size
+                while index < max_index:
+                    pass
 
     @staticmethod
     def _sort_count_dict(count_dict: Dict):
