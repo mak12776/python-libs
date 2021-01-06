@@ -3,8 +3,6 @@ import os
 import typing
 from typing import Union, Callable
 
-from library.math import ceil_module
-
 BinaryFile = typing.Union[typing.BinaryIO, io.RawIOBase]
 TextFile = typing.Union[typing.TextIO, io.TextIOBase]
 AnyFile = typing.Union[BinaryFile, TextFile]
@@ -170,36 +168,42 @@ def bits_mask(width: int):
     return (1 << width) - 1
 
 
-def _bits_io_from_bytes(buffer: bytes):
+def _from_bytes(buffer: bytes):
     return int.from_bytes(buffer, byteorder='big', signed=False)
 
 
+_BITS_IO_SIZE = 8
+
+
 class BitsIO:
-    __slots__ = '_buffer', '_remaining_bits', '_index', '_bit_index'
-
-    def __init__(self, buffer: Union[bytes, bytearray], bits: int = None):
+    def __init__(self, buffer: bytes, bits: int):
         self._buffer = buffer
-        self._remaining_bits = bits or len(buffer)
         self._index = 0
-        self._bit_index = 0
+        self._data_bits = bits
+        self._read_bits = 0
+        self._read_value = 0
 
-    @property
-    def remaining_bits(self):
-        return self._remaining_bits
+    def __iter__(self):
+        return self
 
-    def read(self, width: int):
-        if width > self._remaining_bits:
-            raise EOFError('remaining bits is not enough.')
-        read_bits = self._bit_index + width
-        read_size = ceil_module(read_bits, 8)
+    def __next__(self):
+        if self._read_bits < self._data_bits:
+            if self._index >= len(self._buffer):
+                raise StopIteration
+            new_read_bits = (len(self._buffer) - self._index) * 8
+            self._read_bits += new_read_bits
+            self._read_value = (self._read_value << new_read_bits) | _from_bytes(
+                self._buffer[self._index: self._index + _BITS_IO_SIZE])
+            self._index += _BITS_IO_SIZE
+            if self._read_bits < self._data_bits:
+                raise StopIteration
+        self._read_bits -= self._data_bits
+        value = self._read_value >> self._read_bits
+        self._read_value &= bits_mask(self._read_bits)
+        return value
 
-        self._bit_index = read_bits % 8
-
-        read_value = (_bits_io_from_bytes(self._buffer[self._index:self._index + read_size]) >>
-                      (read_size * 8 - read_bits)) & bits_mask(width)
-
-        read_size = ceil_module(read_bits, 8)
-        return
+    def remaining(self):
+        return self._read_value
 
 
 class FileWrapper:
