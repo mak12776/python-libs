@@ -176,6 +176,8 @@ _BITS_IO_SIZE = 8
 
 
 class BitsIO:
+    __slots__ = '_buffer', '_index', '_data_bits', '_read_bits', '_read_value'
+
     def __init__(self, buffer: bytes, bits: int):
         self._buffer = buffer
         self._index = 0
