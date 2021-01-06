@@ -3,6 +3,8 @@ import os
 import typing
 from typing import Union, Callable
 
+from library.math import ceil_module, lower_bound
+
 BinaryFile = typing.Union[typing.BinaryIO, io.RawIOBase]
 TextFile = typing.Union[typing.TextIO, io.TextIOBase]
 AnyFile = typing.Union[BinaryFile, TextFile]
@@ -35,7 +37,7 @@ def read_file_name(path: str):
 
 
 # read, write
-def read_int(infile: BinaryFile, size: int, byteorder='big', signed=False):
+def read_int(infile: BinaryFile, size: int, byteorder: str, signed: bool):
     buffer = infile.read(size)
     if len(buffer) != size:
         signed = 'signed' if signed else 'unsigned'
@@ -43,23 +45,17 @@ def read_int(infile: BinaryFile, size: int, byteorder='big', signed=False):
     return int.from_bytes(buffer, byteorder, signed=signed)
 
 
-def write_int(outfile: BinaryFile, value: int, size: int, byteorder='big', signed=False):
+def write_int(outfile: BinaryFile, value: int, size: int, byteorder: str, signed: bool):
     return outfile.write(value.to_bytes(size, byteorder, signed=signed))
 
 
-simple_settings = {
-    'byteorder': 'big',
-    'signed': False,
-}
+# read, write unsigned int
+def read_unsigned_int(infile: BinaryFile, size: int):
+    return read_int(infile, size, byteorder='big', signed=False)
 
 
-# read, write simple int
-def read_simple_int(infile: BinaryFile, size: int):
-    return read_int(infile, size, **simple_settings)
-
-
-def write_simple_int(outfile: BinaryFile, value: int, size: int):
-    return write_int(outfile, value, size, **simple_settings)
+def write_unsigned_int(outfile: BinaryFile, value: int, size: int):
+    return write_int(outfile, value, size, byteorder='big', signed=False)
 
 
 # read, write big int
@@ -160,11 +156,11 @@ def write_big_int(outfile: BinaryFile, value: int, signed=True):
 
 
 # read, write bytes
-def read_bytes(infile: BinaryFile, read_size: Callable[[BinaryFile], int]):
+def read_method_bytes(infile: BinaryFile, read_size: Callable[[BinaryFile], int]):
     return infile.read(read_size(infile))
 
 
-def write_bytes(outfile: BinaryFile, buffer: BufferType, write_size: Callable[[BinaryFile, int], int]):
+def write_method_bytes(outfile: BinaryFile, buffer: BufferType, write_size: Callable[[BinaryFile, int], int]):
     total = write_size(outfile, len(buffer))
     return total + outfile.write(buffer)
 
@@ -187,7 +183,8 @@ class FileWrapper:
     def __init__(self, file: AnyFile):
         self._file = file
 
-    def get_file(self):
+    @property
+    def file(self):
         return self._file
 
     def __enter__(self):
@@ -205,10 +202,10 @@ class FileWrapper:
 
     # simple read, write int
     def read_unsigned_int(self, size: int):
-        return read_simple_int(self._file, size)
+        return read_unsigned_int(self._file, size)
 
     def write_unsigned_int(self, value: int, size: int):
-        return write_simple_int(self._file, value, size)
+        return write_unsigned_int(self._file, value, size)
 
     # read, write big int
     def read_big_int(self, signed=True):
@@ -216,6 +213,13 @@ class FileWrapper:
 
     def write_big_int(self, value: int, signed=True):
         return write_big_int(self._file, value, signed=signed)
+
+    # read, write bytes
+    def read_bytes(self, size: int):
+        return self._file.read(size)
+
+    def write_bytes(self, buffer: bytes):
+        return self._file.write(buffer)
 
     @staticmethod
     def open(name, mode='r', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None):
@@ -225,6 +229,20 @@ class FileWrapper:
 
 
 _BITS_IO_SIZE = 8
+
+
+def read_bits(buffer: bytes, data_bits: int):
+    if data_bits == 8:
+        yield from buffer
+    if data_bits % 8 == 0:
+        data_size = data_bits // 8
+        max_index = lower_bound(len(buffer), data_size)
+        index = 0
+        while index < max_index:
+            yield from_bytes(buffer[index: index + data_size])
+    else:
+        data_size = ceil_module(data_bits, 8)
+        raise BaseException('incomplete code')
 
 
 class BitsIO:

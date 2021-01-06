@@ -44,7 +44,7 @@ DataType = Union[int, bytes]
 @dataclass(init=True, repr=True, eq=False)
 class DataCount:
     __slots__ = 'data', 'count'
-    data: Union[int, bytes]
+    data: DataType
     count: int
 
     def format(self, width):
@@ -89,7 +89,7 @@ class SegmentedBuffer:
 
         self.remaining_bits: int = 0
         self.remaining_size: int = 0
-        self.remaining = None
+        self.remaining: DataType = 0
 
     # check & print values
     def check_values(self, file: AnyFile = sys.stderr):
@@ -138,15 +138,19 @@ class SegmentedBuffer:
             raise ValueError(f'unsupported method: {self.method}')
         return SortedList()
 
-    def _write_remaining(self, wrapper: FileWrapper):
+    def _write_remaining(self, wrapper: FileWrapper, size_of_size: int):
         if self.method == Method.INT:
             wrapper.write_unsigned_int(self.remaining, self.remaining_size)
+        elif self.method == Method.BYTE:
+            wrapper.write_bytes(self.remaining)
         else:
             raise ValueError(f'unsupported method: {self.method}')
 
     def _read_remaining(self, wrapper: FileWrapper):
         if self.method == Method.INT:
             self.remaining = wrapper.read_unsigned_int(self.remaining_size)
+        elif self.method == Method.BYTE:
+            self.remaining = wrapper.read_bytes(self.remaining_size)
         else:
             raise ValueError(f'unsupported method: {self.method}')
 
@@ -161,7 +165,7 @@ class SegmentedBuffer:
         self.method.write(wrapper)  # method
         # sorted data count & remaining
         self._write_sorted_data_count(wrapper, size_of_size)
-        self._write_remaining(wrapper)
+        self._write_remaining(wrapper, size_of_size)
 
     def read(self, wrapper: FileWrapper):
         size_of_size = wrapper.read_unsigned_int(1)  # size of size
@@ -218,22 +222,6 @@ class SegmentedBuffer:
     def _sort_count_dict(count_dict: Dict):
         return SortedList((DataCount(key, value) for key, value in count_dict.items()), key=lambda item: item.count)
 
-    def convert(self, data_bits: int):
-        if self.data_bits % data_bits != 0:
-            raise ValueError()
-
-        result = SegmentedBuffer()
-        result.buffer_size = self.buffer_size
-        result.buffer_bits = self.buffer_bits
-
-        result.data_bits = data_bits
-        result.data_size = get_bytes_per_bits(data_bits)
-
-        result.remaining_bits = result.buffer_bits % result.data_bits
-        result.remaining_size = get_bytes_per_bits(result.remaining_bits)
-
-        raise BaseException('incomplete code!')
-
     @staticmethod
     def scan_buffer(data_bits: int, buffer: bytes, method: Method = Method.INT):
         if data_bits <= 1:
@@ -255,6 +243,22 @@ class SegmentedBuffer:
         count_dict, result.remaining = result._scan_data_count(buffer)
         result.sorted_data_count = SegmentedBuffer._sort_count_dict(count_dict)
         return result
+
+    def convert(self, data_bits: int):
+        if self.data_bits % data_bits != 0:
+            raise ValueError()
+
+        result = SegmentedBuffer()
+        result.buffer_size = self.buffer_size
+        result.buffer_bits = self.buffer_bits
+
+        result.data_bits = data_bits
+        result.data_size = get_bytes_per_bits(data_bits)
+
+        result.remaining_bits = result.buffer_bits % result.data_bits
+        result.remaining_size = get_bytes_per_bits(result.remaining_bits)
+
+        raise BaseException('incomplete code!')
 
 
 class DataTree:
