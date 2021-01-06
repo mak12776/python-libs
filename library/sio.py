@@ -47,6 +47,21 @@ def write_int(outfile: BinaryFile, value: int, size: int, byteorder='big', signe
     return outfile.write(value.to_bytes(size, byteorder, signed=signed))
 
 
+simple_settings = {
+    'byteorder': 'big',
+    'signed': False,
+}
+
+
+# read, write simple int
+def read_simple_int(infile: BinaryFile, size: int):
+    return read_int(infile, size, **simple_settings)
+
+
+def write_simple_int(outfile: BinaryFile, value: int, size: int):
+    return write_int(outfile, value, size, **simple_settings)
+
+
 # read, write big int
 INITIAL_MASK = 0b0011_1111
 INITIAL_BITS = 6
@@ -58,6 +73,15 @@ SIGN_MASK = 0b0100_0000
 CONTINUE_MASK = 0b1000_0000
 
 
+def __read_big_int_unsigned(infile: BinaryFile):
+    byte = read_int(infile, 1, byteorder='big', signed=False)
+    value = byte & VALUE_MASK
+    while value & CONTINUE_MASK:
+        byte = read_int(infile, 1, byteorder='big', signed=False)
+        value = (value << VALUE_BITS) | (byte & VALUE_MASK)
+    return value
+
+
 def __read_big_int_signed(infile: BinaryFile):
     byte = read_int(infile, 1, byteorder='big', signed=False)
     is_negative = bool(byte & SIGN_MASK)
@@ -66,15 +90,6 @@ def __read_big_int_signed(infile: BinaryFile):
         byte = read_int(infile, 1, byteorder='big', signed=False)
         value = (value << VALUE_BITS) | (byte & VALUE_MASK)
     return -value if is_negative else value
-
-
-def __read_big_int_unsigned(infile: BinaryFile):
-    byte = read_int(infile, 1, byteorder='big', signed=False)
-    value = byte & VALUE_MASK
-    while value & CONTINUE_MASK:
-        byte = read_int(infile, 1, byteorder='big', signed=False)
-        value = (value << VALUE_BITS) | (byte & VALUE_MASK)
-    return value
 
 
 def read_big_int(infile: BinaryFile, signed: bool = True):
@@ -145,22 +160,12 @@ def write_big_int(outfile: BinaryFile, value: int, signed=True):
 
 
 # read, write bytes
-def read_bytes(infile: BinaryFile, size_of_size: int):
-    return infile.read(read_int(infile, size_of_size, byteorder='big', signed=False))
+def read_bytes(infile: BinaryFile, read_size: Callable[[BinaryFile], int]):
+    return infile.read(read_size(infile))
 
 
-def write_bytes(outfile: BinaryFile, buffer: BufferType, size_of_size: int):
-    total = outfile.write(len(buffer).to_bytes(size_of_size, byteorder='big', signed=False))
-    return total + outfile.write(buffer)
-
-
-# read, write big bytes
-def read_big_bytes(infile: BinaryFile):
-    return infile.read(read_big_int(infile, signed=False))
-
-
-def write_big_bytes(outfile: BinaryFile, buffer: BufferType):
-    total = write_big_int(outfile, len(buffer), signed=False)
+def write_bytes(outfile: BinaryFile, buffer: BufferType, write_size: Callable[[BinaryFile, int], int]):
+    total = write_size(outfile, len(buffer))
     return total + outfile.write(buffer)
 
 
@@ -168,8 +173,55 @@ def bits_mask(width: int):
     return (1 << width) - 1
 
 
-def _from_bytes(buffer: bytes):
+def from_bytes(buffer: bytes):
     return int.from_bytes(buffer, byteorder='big', signed=False)
+
+
+def to_bytes(value: int, size: int):
+    return value.to_bytes(size, byteorder='big', signed=False)
+
+
+class FileWrapper:
+    __slots__ = '_file'
+
+    def __init__(self, file: AnyFile):
+        self._file = file
+
+    def get_file(self):
+        return self._file
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        self._file.close()
+
+    # read, write int
+    def read_int(self, size: int, byteorder: str, signed: bool):
+        return read_int(self._file, size, byteorder=byteorder, signed=signed)
+
+    def write_int(self, value, size: int, byteorder: str, signed: bool):
+        return write_int(self._file, value, size, byteorder=byteorder, signed=signed)
+
+    # simple read, write int
+    def read_unsigned_int(self, size: int):
+        return read_simple_int(self._file, size)
+
+    def write_unsigned_int(self, value: int, size: int):
+        return write_simple_int(self._file, value, size)
+
+    # read, write big int
+    def read_big_int(self, signed=True):
+        return read_big_int(self._file, signed=signed)
+
+    def write_big_int(self, value: int, signed=True):
+        return write_big_int(self._file, value, signed=signed)
+
+    @staticmethod
+    def open(name, mode='r', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None):
+        file = open(name, mode=mode, buffering=buffering, encoding=encoding, errors=errors, newline=newline,
+                    closefd=closefd, opener=opener)
+        return FileWrapper(file)
 
 
 _BITS_IO_SIZE = 8
@@ -194,7 +246,7 @@ class BitsIO:
                 raise StopIteration
             new_read_bits = (len(self._buffer) - self._index) * 8
             self._read_bits += new_read_bits
-            self._read_value = (self._read_value << new_read_bits) | _from_bytes(
+            self._read_value = (self._read_value << new_read_bits) | from_bytes(
                 self._buffer[self._index: self._index + _BITS_IO_SIZE])
             self._index += _BITS_IO_SIZE
             if self._read_bits < self._data_bits:
@@ -206,53 +258,3 @@ class BitsIO:
 
     def remaining(self):
         return self._read_value
-
-
-class FileWrapper:
-    __slots__ = '_file'
-
-    def __init__(self, file: AnyFile):
-        self._file = file
-
-    def get_file(self):
-        return self._file
-
-    def __enter__(self):
-        return self
-
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        self._file.close()
-
-    # read, write int
-    def read_int(self, size: int, byteorder: str = 'big', signed: bool = False):
-        return read_int(self._file, size, byteorder=byteorder, signed=signed)
-
-    def write_int(self, value, size: int, byteorder='big', signed: bool = False):
-        return write_int(self._file, value, size, byteorder=byteorder, signed=signed)
-
-    # read, write big int
-    def read_big_int(self, signed=True):
-        return read_big_int(self._file, signed=signed)
-
-    def write_big_int(self, value: int, signed=True):
-        return write_big_int(self._file, value, signed=signed)
-
-    # read, write bytes
-    def read_bytes(self, size_of_size: int):
-        return read_bytes(self._file, size_of_size)
-
-    def write_bytes(self, buffer: BufferType, size_of_size: int):
-        return write_bytes(self._file, buffer, size_of_size)
-
-    # read, write big bytes
-    def read_big_bytes(self):
-        return read_big_bytes(self._file)
-
-    def write_big_bytes(self, buffer: BufferType):
-        return write_big_bytes(self._file, buffer)
-
-    @staticmethod
-    def open(name, mode='r', buffering=-1, encoding=None, errors=None, newline=None, closefd=True, opener=None):
-        file = open(name, mode=mode, buffering=buffering, encoding=encoding, errors=errors, newline=newline,
-                    closefd=closefd, opener=opener)
-        return FileWrapper(file)
